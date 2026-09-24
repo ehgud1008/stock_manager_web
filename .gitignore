@@ -1,0 +1,32 @@
+# Dependencies and generated build/test output
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Environment files (keep the shareable template)
+.env
+.env.*
+*.env
+!.env.example
+
+# Vercel local project metadata and build output
+.vercel/
+
+# Local editor settings
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Logs and temporary screen-verification files
+*.log
+.qa-*
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

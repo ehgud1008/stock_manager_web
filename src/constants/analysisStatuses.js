@@ -1,0 +1,7 @@
+export const ANALYSIS_STATUS = Object.freeze({
+  READY: 'READY',
+  RUNNING: 'RUNNING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+});
