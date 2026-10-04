@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem,
-  Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from '@mui/material';
+  Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
 import * as api from '../../api/analysisScanApi';
 import AnalysisResultPanel from '../../features/stock-analysis/components/AnalysisResultPanel';
 import AnalysisNarrativePanel from '../../features/stock-analysis/components/AnalysisNarrativePanel';
+import StockChartPanel from '../../features/stock-chart/components/StockChartPanel';
 
 const STATUS = { READY: '실행 대기', RUNNING: '분석 중', COMPLETED: '완료', COMPLETED_WITH_ERRORS: '일부 실패', FAILED: '실패', INTERRUPTED: '중단', PENDING: '미처리', SKIPPED: '제외' };
 const SIGNAL = { BREAKOUT: '돌파', PULLBACK_RECOVERY: '눌림 회복', BREAKOUT_RETEST: '재지지', TREND_BREAKDOWN: '추세 훼손', BREAKOUT_FAILURE: '돌파 실패' };
@@ -18,6 +20,7 @@ const running = run => ['READY', 'RUNNING'].includes(run?.status);
 
 function SnapshotDetail({ selection, onClose }) {
   const [state, setState] = useState({ loading: true });
+  const [tab, setTab] = useState('analysis');
   useEffect(() => {
     const controller = new AbortController();
     api.getAnalysisScanDetail(selection.runId, selection.code, controller.signal)
@@ -25,15 +28,31 @@ function SnapshotDetail({ selection, onClose }) {
       .catch(error => { if (!controller.signal.aborted) setState({ error: error.message }); });
     return () => controller.abort();
   }, [selection]);
-  return <Dialog open onClose={onClose} fullWidth maxWidth="md">
-    <DialogTitle>{selection.name} · 저장된 전체 분석 결과</DialogTitle>
-    <DialogContent><Stack gap={2}>
-      <Alert severity="info">선택한 실행의 저장 결과입니다. 상세 조회는 재분석이나 실시간 시세 조회를 실행하지 않습니다.</Alert>
-      {state.loading && <LinearProgress />}
-      {state.error && <Alert severity="error">{state.error}</Alert>}
-      {state.data && <><AnalysisResultPanel result={state.data} /><AnalysisNarrativePanel reasons={state.data.reasons} warnings={state.data.warnings} /></>}
-    </Stack></DialogContent>
-    <DialogActions><Button component={Link} to={`/analysis/${selection.code}`}>개별 분석 화면</Button><Button onClick={onClose}>닫기</Button></DialogActions>
+  return <Dialog open onClose={onClose} fullWidth maxWidth="lg" aria-labelledby="scan-detail-title">
+    <DialogTitle id="scan-detail-title">{selection.name} · 저장된 전체 분석 결과</DialogTitle>
+    <Tabs value={tab} onChange={(_, value) => setTab(value)} aria-label="종목 상세 보기" sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
+      <Tab value="analysis" label="분석 결과" id="scan-detail-analysis-tab" aria-controls="scan-detail-analysis-panel" />
+      <Tab value="chart" label="차트" id="scan-detail-chart-tab" aria-controls="scan-detail-chart-panel" />
+    </Tabs>
+    <DialogContent sx={{ minHeight: 300 }}>
+      <Box role="tabpanel" id="scan-detail-analysis-panel" aria-labelledby="scan-detail-analysis-tab" hidden={tab !== 'analysis'}>
+        <Stack gap={2}>
+          <Alert severity="info">선택한 실행의 저장 결과입니다. 상세 조회는 재분석이나 실시간 시세 조회를 실행하지 않습니다.</Alert>
+          {state.loading && <LinearProgress />}
+          {state.error && <Alert severity="error">{state.error}</Alert>}
+          {state.data && <><AnalysisResultPanel result={state.data} /><AnalysisNarrativePanel reasons={state.data.reasons} warnings={state.data.warnings} /></>}
+        </Stack>
+      </Box>
+      <Box role="tabpanel" id="scan-detail-chart-panel" aria-labelledby="scan-detail-chart-tab" hidden={tab !== 'chart'}>
+        {tab === 'chart' && <Stack gap={2}>
+          <Alert severity="info">차트는 조회 시점의 가격 데이터입니다. 진입·목표·손절선은 저장된 분석{selection.priceDate ? ` (가격일 ${selection.priceDate})` : ''} 기준이며, 차트 조회로 분석 결과가 변경되지는 않습니다.</Alert>
+          {state.loading && <Typography variant="body2" color="text.secondary">저장된 분석을 불러오는 중입니다. 가격선은 조회 완료 후 표시됩니다.</Typography>}
+          {state.error && <Alert severity="warning">분석 결과를 불러오지 못해 분석 가격선 없이 차트만 표시합니다.</Alert>}
+          <StockChartPanel stockCode={selection.code} analysis={state.data} refreshKey={selection.runId} realData />
+        </Stack>}
+      </Box>
+    </DialogContent>
+    <DialogActions><Button component={Link} to={`/analysis/${selection.code}`} target="_blank" rel="noopener noreferrer" endIcon={<OpenInNewRoundedIcon />}>개별 분석 화면 (새 탭)</Button><Button onClick={onClose}>닫기</Button></DialogActions>
   </Dialog>;
 }
 
@@ -154,12 +173,12 @@ export default function AnalysisScanPage() {
         <TableCell>{STATUS[item.status] || item.status}<Typography variant="caption" display="block">{QUALITY[item.quality] || item.errorCode || '—'}</Typography></TableCell>
         <TableCell sx={{ whiteSpace: 'nowrap' }}>{item.priceDate || '—'}</TableCell>
         <TableCell>{score(item.totalScore)}</TableCell><TableCell>{score(item.riseScore)} / {score(item.entryScore)} / {score(item.riskScore)}</TableCell>
-        <TableCell>{item.buySignal ? `${SIGNAL[item.buySignal] || item.buySignal} · ${STATE[item.buyState] || item.buyState}` : '—'}<Typography variant="caption" display="block">{(item.activeSignals || '').split('|').filter(s => ['BREAKOUT', 'PULLBACK_RECOVERY', 'BREAKOUT_RETEST'].includes(s)).map(s => SIGNAL[s]).join(' · ')}</Typography></TableCell>
-        <TableCell>{item.sellSignal ? `${SIGNAL[item.sellSignal] || item.sellSignal} · ${STATE[item.sellState] || item.sellState}` : '—'}</TableCell>
-        <TableCell>{ENTRY[item.entryStatus] || '—'}</TableCell><TableCell>{price(item.currentPrice)}</TableCell>
+        <TableCell>{item.buySignal ? <Chip size="small" variant="outlined" color={['CONFIRMED', 'ACTIVE'].includes(item.buyState) ? 'success' : 'warning'} label={`${SIGNAL[item.buySignal] || item.buySignal} · ${STATE[item.buyState] || item.buyState}`} /> : '—'}<Typography variant="caption" display="block">{(item.activeSignals || '').split('|').filter(s => ['BREAKOUT', 'PULLBACK_RECOVERY', 'BREAKOUT_RETEST'].includes(s)).map(s => SIGNAL[s]).join(' · ')}</Typography></TableCell>
+        <TableCell>{item.sellSignal ? <Chip size="small" variant="outlined" color={['CONFIRMED', 'ACTIVE'].includes(item.sellState) ? 'error' : 'warning'} label={`${SIGNAL[item.sellSignal] || item.sellSignal} · ${STATE[item.sellState] || item.sellState}`} /> : '—'}</TableCell>
+        <TableCell><Chip size="small" variant="outlined" color={item.entryStatus === 'SELL_SIGNAL_CONFLICT' ? 'error' : item.entryStatus === 'IN_RANGE' ? 'info' : item.entryStatus && item.entryStatus !== 'NONE' ? 'warning' : 'default'} label={ENTRY[item.entryStatus] || '—'} /></TableCell><TableCell>{price(item.currentPrice)}</TableCell>
         <TableCell>{price(item.entryFrom)} ~ {price(item.entryTo)}</TableCell><TableCell>{price(item.targetOne)} / {price(item.targetTwo)}</TableCell>
         <TableCell>{price(item.stopPrice)}</TableCell><TableCell>{item.rewardRisk == null ? '—' : `${Number(item.rewardRisk).toFixed(2)}배`}</TableCell>
-        <TableCell><Button disabled={!item.analysisRunId} onClick={() => setSelection({ runId, code: item.stockCode, name: item.stockName })}>상세</Button></TableCell>
+        <TableCell><Button disabled={!item.analysisRunId} onClick={() => setSelection({ runId, code: item.stockCode, name: item.stockName, priceDate: item.priceDate })}>상세</Button></TableCell>
       </TableRow>)}
       {!loading && !result?.content?.length && <TableRow><TableCell colSpan={14}>{runId ? '조건에 해당하는 결과가 없습니다.' : '전체 분석을 실행하거나 저장된 실행을 선택하세요.'}</TableCell></TableRow>}
     </TableBody></Table></TableContainer>
@@ -168,6 +187,6 @@ export default function AnalysisScanPage() {
       <DialogContent>{confirm === 'start' ? `${market} 일반주식의 전체 분석을 시작합니다. 여러 전문을 수집하므로 시간이 걸릴 수 있습니다. 브라우저를 닫아도 서버에서 계속 실행됩니다.` : confirm === 'resume' ? '저장된 대상 목록에서 실패·미처리 종목만 다시 분석합니다. 완료 결과는 유지합니다.' : '서버 재시작 등으로 실제 작업이 멈춘 경우에만 중단 상태로 정리합니다. 실제 실행 중이면 요청이 거부됩니다.'}</DialogContent>
       <DialogActions><Button onClick={() => setConfirm(null)}>취소</Button><Button onClick={execute}>확인</Button></DialogActions>
     </Dialog>}
-    {selection && <SnapshotDetail selection={selection} onClose={() => setSelection(null)} />}
+    {selection && <SnapshotDetail key={`${selection.runId}:${selection.code}`} selection={selection} onClose={() => setSelection(null)} />}
   </Stack>;
 }

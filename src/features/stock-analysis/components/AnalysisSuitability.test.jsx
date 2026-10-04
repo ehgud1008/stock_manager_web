@@ -12,6 +12,12 @@ const result = {
 };
 
 describe('swing suitability display', () => {
+  it('shows first-target reward/risk using the entry ceiling without treating it as a signal', () => {
+    render(<AnalysisResultPanel result={{ ...result, entryFrom: 9800, entryTo: 10000, targets: [11000, 12000], stopLoss: 9500 }} />);
+    expect(screen.getByText('2.00배')).toBeInTheDocument();
+    expect(screen.getByText(/거래비용 제외이며 매수 신호의 확정 여부와는 별개/)).toBeInTheDocument();
+    expect(screen.queryByText('매수 신호 확정')).not.toBeInTheDocument();
+  });
   it('가격의 소수점만 제거하고 점수 소수점은 유지한다', () => {
     render(<AnalysisResultPanel result={{ ...result, currentPrice: 70000.123, entryFrom: 69000.456,
       entryTo: 70000.789, targets: [75000.678], stopLoss: 68000.123 }} />);

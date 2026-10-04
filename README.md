@@ -1,5 +1,12 @@
 # Stockscope frontend
 
+## Vercel 운영 연결
+
+`vercel.json`은 `/api/:path*` 요청을 `http://140.238.15.94:8080/api/:path*`로 전달하고, 나머지 화면 경로는 `index.html`로 연결합니다.
+Vercel Production 환경변수는 `VITE_API_BASE_URL=/api`, `VITE_USE_MOCKS=false`로 설정한 뒤 새 커밋을 배포하세요. 브라우저에서 HTTP 백엔드를 직접 호출하지 않습니다.
+백엔드 환경변수에는 `APP_CORS_ALLOWED_ORIGINS=https://stock-analysis-web-taupe.vercel.app`을 포함하고 재시작하세요. 프록시가 전달하는 Origin도 백엔드에서 허용되어야 합니다.
+브라우저의 Request URL이 Vercel 도메인의 `/api/...`로 표시되는 것이 정상입니다. Vercel에서 백엔드까지는 HTTP 통신입니다.
+
 국내 주식 분석 웹서비스의 React 프론트엔드 초기 화면입니다. 현재 표시되는 종목, 상태, 차트 모양은 UI 확인용 목업이며 실제 시세, 투자 추천, 분석 결과가 아닙니다.
 
 ## 요구 환경

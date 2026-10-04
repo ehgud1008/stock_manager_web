@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import TradeSignalPanel from './TradeSignalPanel';
 const signal = { id: 'BREAKOUT:2026-09-18', type: 'BREAKOUT', side: 'BUY', state: 'CONFIRMED',
@@ -26,12 +26,16 @@ describe('매매 신호 표시', () => {
   });
   it.each([['PRELIMINARY', '매수 예비 신호'], ['ACTIVE', '매수 시그널 유지 중'], ['INVALIDATED', '매수 신호 무효화'], ['EXPIRED', '매수 신호 만료']])('%s를 새 확정 신호로 표시하지 않는다', (state, label) => {
     render(<TradeSignalPanel report={{ ...report, signals: [{ ...signal, state }] }} />);
+    if (['INVALIDATED', 'EXPIRED'].includes(state)) {
+      expect(screen.queryByText(`${label} · 돌파 확인`)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /지난 신호/ }));
+    }
     expect(screen.getByText(`${label} · 돌파 확인`)).toBeInTheDocument();
     expect(screen.queryByText('매수 시그널 확정 · 돌파 확인')).not.toBeInTheDocument();
   });
   it('추격 금지를 함께 표시한다', () => {
     render(<TradeSignalPanel report={{ ...report, signals: [{ ...signal, entryStatus: 'CHASE_BLOCKED' }] }} />);
-    expect(screen.getByText('현재 추격 진입 보류')).toBeInTheDocument();
+    expect(screen.getAllByText('현재 추격 진입 보류')).toHaveLength(2);
   });
   it('과거 결과에 신호 필드가 없으면 숨긴다', () => {
     const { container } = render(<TradeSignalPanel />); expect(container).toBeEmptyDOMElement();
@@ -40,5 +44,18 @@ describe('매매 신호 표시', () => {
     render(<TradeSignalPanel report={{ ...report, completeness: 'INSUFFICIENT_DATA', signals: [] }} />);
     expect(screen.getByText(/신호 판정을 보류했습니다/)).toBeInTheDocument();
     expect(screen.queryByText(/신호 조건에 해당하지 않습니다/)).not.toBeInTheDocument();
+  });
+  it('매수 확정과 추격 진입 보류를 분리해 요약한다', () => {
+    render(<TradeSignalPanel report={{ ...report, signals: [{ ...signal, entryStatus: 'CHASE_BLOCKED' }] }} />);
+    expect(screen.getByText('매수 신호 확정')).toBeInTheDocument();
+    expect(screen.getByText('매수 신호는 있으나 진입 보류')).toBeInTheDocument();
+    expect(screen.queryByText('진입 구간 내 · 검토 가능')).not.toBeInTheDocument();
+  });
+  it('진입 구간 안이어도 유효 매도 신호가 있으면 충돌을 우선 표시한다', () => {
+    render(<TradeSignalPanel report={{ ...report, signals: [signal,
+      { ...signal, id: 'sell', side: 'SELL', type: 'TREND_BREAKDOWN' }] }} />);
+    expect(screen.getByText('신규 진입 보류')).toBeInTheDocument();
+    expect(screen.getByText('보유 시 매도 신호 확정')).toBeInTheDocument();
+    expect(screen.queryByText('진입 구간 내 · 검토 가능')).not.toBeInTheDocument();
   });
 });

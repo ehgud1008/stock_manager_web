@@ -1,6 +1,7 @@
 import { Box, Chip, Divider, LinearProgress, Stack, Typography } from '@mui/material';
 import PropTypes from 'prop-types';
 import TradeSignalPanel from './TradeSignalPanel';
+import SignalSummary from './SignalSummary';
 
 const formatPrice = (value) => value == null ? '산출 전' : `${Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}원`;
 const formatScore = (value) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -25,10 +26,12 @@ export default function AnalysisResultPanel({ result }) {
     : suitability ? { BUY_CANDIDATE: '매수 검토', WATCH: '관찰', WAIT: '진입 대기', AVOID: '회피' }[result.strategyAction] : action.label;
   const score = Number(result.totalScore || 0);
   const riskRate = result.entryTo && result.stopLoss ? ((result.entryTo - result.stopLoss) / result.entryTo) * 100 : null;
+  const rewardRisk = result.entryTo > result.stopLoss && result.stopLoss != null && result.targets.length
+    ? (result.targets[0] - result.entryTo) / (result.entryTo - result.stopLoss) : null;
 
   return (
     <Stack gap={2.25}>
-      <TradeSignalPanel report={result.signalReport} />
+      {result.signalReport && <SignalSummary report={result.signalReport} />}
       <Box>
         <Stack direction="row" alignItems="flex-end" justifyContent="space-between" gap={1}>
           <Box>
@@ -42,6 +45,7 @@ export default function AnalysisResultPanel({ result }) {
           <Chip label={actionLabel} size="small" color={action.color} variant="outlined" />
         </Stack>
         {result.totalScore != null && <LinearProgress variant="determinate" value={score} sx={{ mt: 2, height: 5, borderRadius: 5 }} />}
+        <Typography variant="caption" color="text.secondary">점수는 종목의 조건을 평가합니다. 실제 매수 조건 충족 여부는 위 신호와 진입 상태를 확인하세요.</Typography>
       </Box>
       {suitability && <Stack gap={1}>
         <Typography variant="body2" color={suitability.status === 'COMPLETE' ? 'text.secondary' : 'warning.main'}>
@@ -72,8 +76,11 @@ export default function AnalysisResultPanel({ result }) {
         <MetricRow label="목표가" value={result.targets.length ? result.targets.map(formatPrice).join(' / ') : '유효 시나리오 없음'} color="success.main" />
         <MetricRow label="손절가" value={formatPrice(result.stopLoss)} color="error.main" />
         <MetricRow label="진입 상단 기준 위험률" value={riskRate == null ? '산출 불가' : `${riskRate.toFixed(1)}%`} />
+        <MetricRow label="1차 목표 손익비" value={rewardRisk == null ? '산출 불가' : `${rewardRisk.toFixed(2)}배`} />
+        <Typography variant="caption" color="text.secondary">손익비 = (1차 목표가 − 진입 상단) ÷ (진입 상단 − 손절가). 거래비용 제외이며 매수 신호의 확정 여부와는 별개입니다.</Typography>
       </Stack>
       <Typography variant="caption" color="text.secondary">계산 버전 {result.engineVersion}</Typography>
+      <TradeSignalPanel report={result.signalReport} showSummary={false} />
       <Stack direction="row" justifyContent="space-between" sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(139,218,99,.06)', border: '1px solid rgba(139,218,99,.12)' }}>
         <Typography variant="caption" color="primary.main">과거 표본 {result.historicalSampleCount}건</Typography>
         <Typography variant="caption" color="text.secondary">데이터 {result.dataQualityStatus}</Typography>

@@ -27,12 +27,55 @@ describe('시장 전체 종합분석', () => {
     fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
     expect(await screen.findByRole('heading', { name: '추세 구조' })).toBeInTheDocument();
     expect(screen.getByText(/저장된 분석은 다시 실행하지 않습니다/)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '스테이징' })).toHaveAttribute('aria-selected', 'true');
+    expect(StockChartPanel).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: '종목 평가와 가격 구간' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '종목분석' }));
+    expect(screen.getByRole('tabpanel', { name: '종목분석' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '종목 평가와 가격 구간' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '매수·매도 시그널' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /팩터별 점수와 근거/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '추세 구조' })).not.toBeInTheDocument();
+    expect(StockChartPanel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: '차트', exact: true }));
+    expect(screen.getByRole('tabpanel', { name: '차트' })).toBeVisible();
     expect(StockChartPanel).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: '005930', realData: true, refreshKey: '2026-09-19T04:00:00',
       analysis: unifiedAnalysisFixture().result.analysis.scenario,
     }), undefined);
     expect(screen.getByText(/분석 가격일 2026-09-18 기준/)).toBeInTheDocument();
     expect(api.getUnifiedDetail).toHaveBeenCalledWith('unified-1', '005930', expect.any(AbortSignal));
+    expect(api.getUnifiedDetail).toHaveBeenCalledTimes(1);
+    expect(api.analyzeUnifiedStock).not.toHaveBeenCalled();
+    expect(api.startUnifiedRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: '종목 평가와 가격 구간' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '스테이징' }));
+    expect(screen.getByRole('table', { name: '종합분석 EMA' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '가격 차트' })).not.toBeInTheDocument();
+  });
+  it('상세 조회 오류 후 선택한 탭에서 재조회할 수 있다', async () => {
+    api.getUnifiedDetail.mockRejectedValueOnce(new Error('상세 조회 실패')).mockResolvedValueOnce(unifiedAnalysisFixture());
+    setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
+    await screen.findByText('상세 조회 실패');
+    fireEvent.click(screen.getByRole('tab', { name: '종목분석' }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 조회' }));
+    expect(await screen.findByRole('heading', { name: '종목 평가와 가격 구간' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '종목분석' })).toHaveAttribute('aria-selected', 'true');
+    expect(StockChartPanel).not.toHaveBeenCalled();
+  });
+  it('팝업을 다시 열면 기본 스테이징 탭으로 돌아온다', async () => {
+    setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
+    await screen.findByRole('heading', { name: '추세 구조' });
+    fireEvent.click(screen.getByRole('tab', { name: '차트', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    StockChartPanel.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
+    await screen.findByRole('heading', { name: '추세 구조' });
+    expect(screen.getByRole('tab', { name: '스테이징' })).toHaveAttribute('aria-selected', 'true');
+    expect(StockChartPanel).not.toHaveBeenCalled();
   });
   it('스테이지와 점수·전환 조건을 함께 서버에 전달한다', async () => {
     setup(); await screen.findByText('삼성전자');
@@ -48,6 +91,35 @@ describe('시장 전체 종합분석', () => {
     await waitFor(() => expect(api.getUnifiedItems).toHaveBeenLastCalledWith('unified-1', expect.not.objectContaining({ entryStatus: 'IN_RANGE' }), expect.any(AbortSignal)));
     fireEvent.mouseDown(screen.getByLabelText('진입 상태'));
     expect(await screen.findByRole('option', { name: '전체', exact: true })).toHaveAttribute('aria-selected', 'true');
+  });
+  it('시장·최소 거래량·최소 거래대금은 기존 정렬을 유지한 검색조건으로 보내며 초기화한다', async () => {
+    api.getUnifiedItems.mockResolvedValue({ ...page, content: [{ ...item, volume: 123456, tradingAmountMillionWon: 10025 }] });
+    setup(); await screen.findByText('삼성전자');
+    expect(screen.getByText('123,456')).toBeInTheDocument();
+    expect(screen.getByText('100.25')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText('결과 시장'));
+    fireEvent.click(await screen.findByRole('option', { name: '코스닥', exact: true }));
+    fireEvent.change(screen.getByLabelText('최소 거래량 (주)'), { target: { value: '100000' } });
+    fireEvent.change(screen.getByLabelText('최소 거래대금 (억원)'), { target: { value: '100.25' } });
+    fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+    await waitFor(() => expect(api.getUnifiedItems).toHaveBeenLastCalledWith('unified-1', expect.objectContaining({
+      market: 'KOSDAQ', minVolume: '100000', minTradingAmountEok: '100.25', sort: 'totalScore', ascending: false, page: 0,
+    }), expect.any(AbortSignal)));
+    expect(api.startUnifiedRun).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '초기화', exact: true }));
+    await waitFor(() => {
+      const params = api.getUnifiedItems.mock.calls.at(-1)[1];
+      expect(params).not.toHaveProperty('market');
+      expect(params).not.toHaveProperty('minVolume');
+      expect(params).not.toHaveProperty('minTradingAmountEok');
+    });
+    expect(screen.getByLabelText('최소 거래량 (주)')).toHaveValue(null);
+    expect(screen.getByLabelText('최소 거래대금 (억원)')).toHaveValue(null);
+  });
+  it('새 값이 없는 과거 결과를 0으로 표시하지 않는다', async () => {
+    setup(); await screen.findByText('삼성전자');
+    expect(screen.getAllByText('미저장·미확인')).toHaveLength(2);
+    expect(screen.getByText(/최소값 조건에서 제외됩니다/)).toBeInTheDocument();
   });
   it('새 실행을 확인하고 중복 방지 키를 전송한다', async () => {
     api.startUnifiedRun.mockResolvedValue(run); setup(); await screen.findByText('삼성전자');

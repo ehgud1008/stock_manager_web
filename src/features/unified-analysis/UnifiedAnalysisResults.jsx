@@ -4,6 +4,7 @@ import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, Divide
 import SectionCard from '../../components/common/SectionCard';
 import FactorScorePanel from '../stock-analysis/components/FactorScorePanel';
 import TradeSignalPanel from '../stock-analysis/components/TradeSignalPanel';
+import SignalSummary from '../stock-analysis/components/SignalSummary';
 import StockChartPanel from '../stock-chart/components/StockChartPanel';
 import { GAP_LABELS, signed, STAGES } from '../screener/screenerModel';
 
@@ -29,7 +30,10 @@ function Row({ label, value }) {
   </Stack>;
 }
 
-export default function UnifiedAnalysisResults({ data, saved = false }) {
+export default function UnifiedAnalysisResults({ data, saved = false, section = 'all' }) {
+  const showStage = section === 'all' || section === 'stage';
+  const showAnalysis = section === 'all' || section === 'analysis';
+  const showChart = section === 'all' || section === 'chart';
   const { result, collectionWarnings, collectionQuality } = data;
   const { stock, analysis, screener } = result;
   const stage = STAGES.find(item => item.id === screener.stage);
@@ -46,14 +50,16 @@ export default function UnifiedAnalysisResults({ data, saved = false }) {
         <Typography color="text.secondary" variant="body2" mt={0.75}>{stock.stockCode} · 가격일 {result.priceDate} · 분석 기준 {result.asOf.replace('T', ' ')} (한국시간)</Typography></Box>
       <Chip size="small" variant="outlined" color={qualityLimited ? 'warning' : 'success'} label={qualityLimited ? '일부 항목 확인 필요' : '분석 완료'} />
     </Stack>
-    <Grid container spacing={2}>
-      <Grid size={{ xs: 6, lg: 3 }}><Metric label="추세 스테이지" caption={stage?.label || QUALITY[screener.quality]} color={stage?.color}>{stageText(screener.stage)}</Metric></Grid>
-      <Grid size={{ xs: 6, lg: 3 }}><Metric label="스윙 적합도" caption={analysis.totalScore == null ? '대표점수 산출 보류' : '100점 기준 · 기존 종목 평가'}>{number(analysis.totalScore)}</Metric></Grid>
-      <Grid size={{ xs: 6, lg: 3 }}><Metric label="평가 종가" caption={`${result.priceDate} 완료 일봉`}>{price(stock.currentPrice)}</Metric></Grid>
-      <Grid size={{ xs: 6, lg: 3 }}><Metric label="유효 매매 신호" caption={analysis.signalReport.completeness === 'READY' ? '확정·유지 신호' : '패턴 신호 표본 부족'}>{analysis.signalReport.completeness === 'READY' ? `${liveSignals.length}개` : '판정 보류'}</Metric></Grid>
-    </Grid>
+    {(showStage || showAnalysis) && <Grid container spacing={2}>
+      {showStage && <Grid size={{ xs: 6, lg: section === 'all' ? 3 : 6 }}><Metric label="추세 스테이지" caption={stage?.label || QUALITY[screener.quality]} color={stage?.color}>{stageText(screener.stage)}</Metric></Grid>}
+      {showAnalysis && <Grid size={{ xs: 6, lg: section === 'all' ? 3 : 4 }}><Metric label="스윙 적합도" caption={analysis.totalScore == null ? '대표점수 산출 보류' : '100점 기준 · 기존 종목 평가'}>{number(analysis.totalScore)}</Metric></Grid>}
+      <Grid size={{ xs: 6, lg: section === 'all' ? 3 : showStage ? 6 : 4 }}><Metric label="평가 종가" caption={`${result.priceDate} 완료 일봉`}>{price(stock.currentPrice)}</Metric></Grid>
+      {showAnalysis && <Grid size={{ xs: 6, lg: section === 'all' ? 3 : 4 }}><Metric label="유효 매매 신호" caption={analysis.signalReport.completeness === 'READY' ? '확정·유지 신호' : '패턴 신호 표본 부족'}>{analysis.signalReport.completeness === 'READY' ? `${liveSignals.length}개` : '판정 보류'}</Metric></Grid>}
+    </Grid>}
 
-    <SectionCard title="가격 차트" caption={`차트는 조회 시점의 가격 데이터입니다. 진입·목표·손절선은 분석 가격일 ${result.priceDate} 기준이며, 차트를 조회해도 분석 결과는 바뀌지 않습니다.`}>
+    {showAnalysis && <SignalSummary report={analysis.signalReport} />}
+
+    {showChart && <SectionCard title="가격 차트" caption={`차트는 조회 시점의 가격 데이터입니다. 진입·목표·손절선은 분석 가격일 ${result.priceDate} 기준이며, 차트를 조회해도 분석 결과는 바뀌지 않습니다.`}>
       <StockChartPanel
         key={`${stock.stockCode}:${result.asOf}`}
         stockCode={stock.stockCode}
@@ -61,10 +67,10 @@ export default function UnifiedAnalysisResults({ data, saved = false }) {
         refreshKey={result.asOf}
         realData
       />
-    </SectionCard>
+    </SectionCard>}
 
-    <Grid container spacing={2.5}>
-      <Grid size={{ xs: 12, lg: 7 }}><SectionCard title="추세 구조" caption="EMA 배열과 전환 흐름을 함께 확인하세요." action={<Chip size="small" variant="outlined" label={QUALITY[screener.quality] || '미확인'} />}>
+    {(showStage || showAnalysis) && <Grid container spacing={2.5}>
+      {showStage && <Grid size={{ xs: 12, lg: section === 'all' ? 7 : 12 }}><SectionCard title="추세 구조" caption="EMA 배열과 전환 흐름을 함께 확인하세요." action={<Chip size="small" variant="outlined" label={QUALITY[screener.quality] || '미확인'} />}>
         <Stack gap={2.5}>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 0.75 }}>
             {STAGES.map(item => <Tooltip key={item.id} title={`${item.label} · ${item.order}`}><Box sx={{ p: { xs: 0.75, sm: 1.25 }, textAlign: 'center', borderRadius: 2,
@@ -94,8 +100,8 @@ export default function UnifiedAnalysisResults({ data, saved = false }) {
             </Tooltip>)}</Stack>
           </Box>
         </Stack>
-      </SectionCard></Grid>
-      <Grid size={{ xs: 12, lg: 5 }}><SectionCard title="종목 평가와 가격 구간" caption="같은 종가로 계산한 전략과 시나리오">
+      </SectionCard></Grid>}
+      {showAnalysis && <Grid size={{ xs: 12, lg: section === 'all' ? 5 : 12 }}><SectionCard title="종목 평가와 가격 구간" caption="같은 종가로 계산한 전략과 시나리오">
         <Stack gap={2}>
           <Typography variant="h2">{analysis.strategy.strategyName}</Typography>
           {analysis.totalScore != null ? <LinearProgress variant="determinate" value={analysis.totalScore} sx={{ height: 6, borderRadius: 4 }} />
@@ -114,13 +120,13 @@ export default function UnifiedAnalysisResults({ data, saved = false }) {
           <Row label="52주 고점과의 거리" value={`${number(screener.features?.high52Week?.distancePercent, 2)}%`} />
           {screener.features?.high52Week?.coverage !== 'FULL_WINDOW' && <Typography variant="caption" color="warning.main">52주 정보는 부분 이력 또는 데이터 부족 상태입니다.</Typography>}
         </Stack>
-      </SectionCard></Grid>
-      <Grid size={{ xs: 12 }}><SectionCard><TradeSignalPanel report={analysis.signalReport} /></SectionCard></Grid>
-    </Grid>
+      </SectionCard></Grid>}
+      {showAnalysis && <Grid size={{ xs: 12 }}><SectionCard><TradeSignalPanel report={analysis.signalReport} showSummary={false} /></SectionCard></Grid>}
+    </Grid>}
 
     <Box>
-      <Accordion disableGutters><AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography fontWeight={600}>팩터별 점수와 근거 · {analysis.factors.length}개</Typography></AccordionSummary>
-        <AccordionDetails><FactorScorePanel factors={factors} /></AccordionDetails></Accordion>
+      {showAnalysis && <Accordion disableGutters><AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography fontWeight={600}>팩터별 점수와 근거 · {analysis.factors.length}개</Typography></AccordionSummary>
+        <AccordionDetails><FactorScorePanel factors={factors} /></AccordionDetails></Accordion>}
       <Accordion disableGutters><AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography fontWeight={600}>데이터 범위와 확인 사항</Typography></AccordionSummary>
         <AccordionDetails><Stack gap={1.5}>
           <Typography variant="body2">사용 표본: 일봉 {result.dailyBarCount}개 · 주봉 {result.weeklyBarCount}개 · 월봉 {result.monthlyBarCount}개</Typography>

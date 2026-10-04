@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AnalysisScanPage from './AnalysisScanPage';
 import * as api from '../../api/analysisScanApi';
 import { completedAnalysisMock } from '../../mocks/analysisMockData';
+import StockChartPanel from '../../features/stock-chart/components/StockChartPanel';
 vi.mock('../../api/analysisScanApi');
+vi.mock('../../features/stock-chart/components/StockChartPanel', () => ({
+  default: vi.fn(() => <div aria-label="종목 가격 차트" />),
+}));
 const run = { runId: 'scan-1', market: 'ALL', baseDate: '2026-09-18', engineVersion: 'analysis-v6-swing', status: 'COMPLETED', total: 2, completed: 2, failed: 0, skipped: 0 };
 const item = { stockCode: '005930', stockName: '삼성전자', market: 'KOSPI', status: 'COMPLETED', quality: 'PARTIAL', priceDate: '2026-09-18', analysisRunId: 101,
   totalScore: 76.2, riseScore: 80, entryScore: 70, riskScore: 60, buySignal: 'BREAKOUT', buyState: 'CONFIRMED', entryStatus: 'CHASE_BLOCKED',
@@ -15,6 +19,44 @@ describe('전체 종목분석', () => {
   beforeEach(() => {
     vi.resetAllMocks(); api.listAnalysisScans.mockResolvedValue([run]); api.getAnalysisScanItems.mockResolvedValue(page);
     api.getAnalysisScanDetail.mockResolvedValue(completedAnalysisMock);
+    StockChartPanel.mockImplementation(() => <div aria-label="종목 가격 차트" />);
+  });
+  it('차트 탭을 선택할 때만 실제 가격 차트를 열고 저장 분석의 가격선을 전달한다', async () => {
+    setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세' }));
+    await screen.findByText('72.5');
+    expect(screen.getByRole('tab', { name: '분석 결과' })).toHaveAttribute('aria-selected', 'true');
+    expect(StockChartPanel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: '차트', exact: true }));
+    expect(screen.getByRole('tabpanel', { name: '차트' })).toBeVisible();
+    expect(screen.getByLabelText('종목 가격 차트')).toBeInTheDocument();
+    expect(StockChartPanel.mock.calls.at(-1)[0]).toEqual(expect.objectContaining({
+      stockCode: '005930', analysis: completedAnalysisMock, refreshKey: 'scan-1', realData: true,
+    }));
+    expect(screen.getByText(/가격일 2026-09-18/)).toBeInTheDocument();
+    expect(api.getAnalysisScanDetail).toHaveBeenCalledTimes(1);
+    expect(api.startAnalysisScan).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: '분석 결과' }));
+    expect(screen.queryByLabelText('종목 가격 차트')).not.toBeInTheDocument();
+    expect(screen.getByText('72.5')).toBeVisible();
+  });
+  it('개별 분석 화면은 원래 목록을 유지하는 새 탭 링크이다', async () => {
+    setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세' }));
+    const link = screen.getByRole('link', { name: '개별 분석 화면 (새 탭)' });
+    expect(link).toHaveAttribute('href', '/analysis/005930');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    await screen.findByText('72.5');
+  });
+  it('분석 조회가 실패해도 차트는 별도로 확인할 수 있다', async () => {
+    api.getAnalysisScanDetail.mockRejectedValue(new Error('분석 조회 실패'));
+    setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세' }));
+    await screen.findByText('분석 조회 실패');
+    fireEvent.click(screen.getByRole('tab', { name: '차트', exact: true }));
+    expect(screen.getByText(/분석 가격선 없이 차트만 표시/)).toBeInTheDocument();
+    expect(StockChartPanel.mock.calls.at(-1)[0].analysis).toBeUndefined();
   });
   it('저장 결과만 조회하며 실행이나 상세 재분석을 자동 요청하지 않는다', async () => {
     setup(); expect(await screen.findByText('삼성전자')).toBeInTheDocument();
