@@ -7,6 +7,8 @@ import SectionCard from '../../components/common/SectionCard';
 import useStockMaster from '../../features/stock-search/hooks/useStockMaster';
 import { searchStockMaster } from '../../features/stock-search/services/stockMasterService';
 import UnifiedAnalysisResults from '../../features/unified-analysis/UnifiedAnalysisResults';
+import TradeDecisionPanel from '../../features/trade-decision/TradeDecisionPanel';
+import * as decisions from '../../api/tradeDecisionApi';
 
 export default function UnifiedSingleAnalysisPage() {
   const { stocks, status, error: masterError } = useStockMaster();
@@ -14,15 +16,54 @@ export default function UnifiedSingleAnalysisPage() {
   const [query, setQuery] = useState('');
   const [state, setState] = useState({ status: 'idle' });
   const active = useRef(null);
+  const snapshotRequest = useRef(null);
+  const [capabilities, setCapabilities] = useState(null);
+  const [capabilityError, setCapabilityError] = useState('');
   const allowed = useMemo(() => stocks.filter(stock => stock.stockType === 'ST' && /^[0-9]{6}$/.test(stock.stockCode)), [stocks]);
   const options = useMemo(() => query.trim() ? searchStockMaster(allowed, query) : allowed.slice(0, 30), [allowed, query]);
   useEffect(() => () => active.current?.abort(), []);
+  useEffect(() => {
+    const c = new AbortController();
+    decisions.getDecisionCapabilities(c.signal).then(value => { if (!c.signal.aborted) setCapabilities(value); })
+      .catch(e => { if (!c.signal.aborted) { setCapabilityError(e.message); setCapabilities({ enabled: false }); } });
+    return () => c.abort();
+  }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('snapshot');
+    const sourceRun = params.get('sourceRun'); const code = params.get('stock');
+    if (!capabilities?.enabled || (!id && !(sourceRun && /^[0-9]{6}$/.test(code)))) return;
+    const c = new AbortController(); active.current = c; setState({ status: 'running' });
+    const source = { source: 'UNIFIED_RUN_ITEM', runId: sourceRun };
+    const initial = id ? decisions.getSnapshot(id, c.signal) : decisions.startSnapshot(code,
+      decisions.requestIdentity(`snapshot-source:${code}`, source), c.signal, source);
+    initial.then(j => {
+      if (!c.signal.aborted) {
+        setSelected({ stockCode: j.stockCode, stockName: j.stockCode, stockType: 'ST' });
+        if (!id) decisions.updateDecisionLocation(j.id);
+      }
+      return decisions.waitForJob(j, decisions.getSnapshot, c.signal);
+    })
+      .then(j => {
+        if (c.signal.aborted) return;
+        if (j.status === 'FAILED') { setState({ status: 'error', failedJob: true, message: decisions.decisionErrorMessage(j.errorCode) }); return; }
+        const data = j.result.analysis;
+        const stock = data.result.stock;
+        setSelected({ stockCode: stock.stockCode, stockName: stock.stockName, marketType: stock.marketCode, stockType: 'ST' });
+        setQuery(`${stock.stockName} ${stock.stockCode}`);
+        setState({ status: 'success', data, snapshotId: j.id });
+      }).catch(e => { if (!c.signal.aborted) setState({ status: 'error', message: e.message }); })
+      .finally(() => { if (active.current === c) active.current = null; });
+    return () => { c.abort(); if (active.current === c) active.current = null; };
+  }, [capabilities?.enabled]);
 
   const select = (_, stock) => {
     active.current?.abort();
     active.current = null;
     setSelected(stock);
     setState({ status: 'idle' });
+    snapshotRequest.current = null;
+    decisions.updateDecisionLocation(null);
   };
   const execute = async () => {
     if (!selected || active.current) return;
@@ -30,8 +71,22 @@ export default function UnifiedSingleAnalysisPage() {
     active.current = controller;
     setState({ status: 'running' });
     try {
-      const data = await analyzeUnifiedStock(selected.stockCode, controller.signal);
-      if (!controller.signal.aborted && active.current === controller) setState({ status: 'success', data });
+      if (capabilities?.enabled) {
+        if (!snapshotRequest.current) snapshotRequest.current = decisions.requestIdentity(`snapshot-request:${selected.stockCode}`, { code: selected.stockCode }, state.status === 'success' || state.failedJob);
+        const initial = await decisions.startSnapshot(selected.stockCode, snapshotRequest.current, controller.signal);
+        if (controller.signal.aborted) return;
+        decisions.updateDecisionLocation(initial.id);
+        const done = await decisions.waitForJob(initial, decisions.getSnapshot, controller.signal);
+        if (!controller.signal.aborted && active.current === controller) {
+          snapshotRequest.current = null;
+          try { sessionStorage.removeItem(`snapshot-request:${selected.stockCode}`); } catch { /* Request identity is retained in the URL. */ }
+          if (done.status === 'FAILED') setState({ status: 'error', failedJob: true, message: decisions.decisionErrorMessage(done.errorCode) });
+          else setState({ status: 'success', data: done.result.analysis, snapshotId: done.id });
+        }
+      } else {
+        const data = await analyzeUnifiedStock(selected.stockCode, controller.signal);
+        if (!controller.signal.aborted && active.current === controller) setState({ status: 'success', data });
+      }
     } catch (error) {
       if (!controller.signal.aborted && active.current === controller) setState({ status: 'error', message: error.message });
     } finally {
@@ -55,13 +110,18 @@ export default function UnifiedSingleAnalysisPage() {
           renderInput={params => <TextField {...params} label="종목명 또는 종목코드" placeholder="예: 삼성전자, 005930" error={status === 'error'} helperText={masterError?.message}
             InputProps={{ ...params.InputProps, endAdornment: <>{status === 'loading' && <CircularProgress size={18} />}{params.InputProps.endAdornment}</> }} />} />
         <Button variant="contained" startIcon={state.status === 'running' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowRoundedIcon />}
-          onClick={execute} disabled={!selected || state.status === 'running'} sx={{ height: 56, minWidth: 172 }}>{state.status === 'running' ? '분석 중…' : '종합분석 실행'}</Button>
+          onClick={execute} disabled={!selected || !capabilities || state.status === 'running'} sx={{ height: 56, minWidth: 172 }}>{state.status === 'running' ? '분석 중…' : '종합분석 실행'}</Button>
       </Stack>
-      <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>현재가는 마지막 확정 종가로 평가합니다. 결과는 이 화면에서만 유지되며, 다시 실행하면 새로 수집합니다.</Typography>
+      <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>현재가는 마지막 확정 종가로 평가합니다. {capabilities?.enabled ? '분석 결과를 저장하며, AI 검토는 분석 완료 후 별도로 요청할 수 있습니다.' : '결과는 이 화면에서만 유지되며, 다시 실행하면 새로 수집합니다.'}</Typography>
     </SectionCard>
+    {capabilityError && <Alert severity="warning">저장 분석 설정을 확인하지 못했습니다: {capabilityError}. 기본 종목 분석을 사용할 수 있습니다.</Alert>}
+    {capabilities && !capabilities.enabled && !capabilityError && <Alert severity="info">AI 매매 판단은 서버의 저장 분석 기능을 활성화한 후 사용할 수 있습니다.</Alert>}
     {state.status === 'running' && <Box role="status"><LinearProgress sx={{ borderRadius: 2 }} /><Typography color="text.secondary" variant="body2" mt={1.5}>일봉과 부가 자료를 수집하고 추세·점수·신호를 계산하고 있습니다.</Typography></Box>}
     {state.status === 'error' && <Alert severity="error" action={<Button color="inherit" onClick={execute}>다시 실행</Button>}>{state.message}</Alert>}
-    {state.status === 'success' && <UnifiedAnalysisResults data={state.data} />}
+    {state.status === 'success' && <>
+      <UnifiedAnalysisResults data={state.data} saved={Boolean(state.snapshotId)} />
+      {state.snapshotId && <TradeDecisionPanel key={state.snapshotId} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} />}
+    </>}
     {state.status === 'idle' && <SectionCard><Stack alignItems="center" textAlign="center" sx={{ py: { xs: 4, md: 7 } }} gap={1.5}>
       <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(139,218,99,.08)', color: 'primary.main' }}><AutoAwesomeRoundedIcon sx={{ fontSize: 32 }} /></Box>
       <Typography variant="h2">종목의 흐름과 매매 조건을 한눈에</Typography>

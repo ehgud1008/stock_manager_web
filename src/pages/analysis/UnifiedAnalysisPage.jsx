@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import * as api from '../../api/unifiedAnalysisApi';
 import SectionCard from '../../components/common/SectionCard';
 import UnifiedAnalysisResults from '../../features/unified-analysis/UnifiedAnalysisResults';
+import UnifiedDecisionTab from '../../features/trade-decision/UnifiedDecisionTab';
 import { STAGES } from '../../features/screener/screenerModel';
 
 const STATUS = { READY: '실행 대기', RUNNING: '분석 중', COMPLETED: '완료', COMPLETED_WITH_ERRORS: '일부 실패', FAILED: '실패', INTERRUPTED: '중단', PENDING: '미처리', SKIPPED: '제외' };
@@ -22,6 +23,7 @@ function SavedDetail({ selection, onClose }) {
   const [state, setState] = useState({ loading: true });
   const [retry, setRetry] = useState(0);
   const [tab, setTab] = useState('stage');
+  const [aiVisited, setAiVisited] = useState(false);
   const contentRef = useRef(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -33,8 +35,8 @@ function SavedDetail({ selection, onClose }) {
   }, [selection, retry]);
   return <Dialog open fullWidth maxWidth="lg" onClose={onClose} aria-labelledby="unified-detail-title">
     <DialogTitle id="unified-detail-title">{selection.name} · 종합분석 상세</DialogTitle>
-    <Tabs value={tab} onChange={(_, value) => { setTab(value); if (contentRef.current) contentRef.current.scrollTop = 0; }} aria-label="종합분석 상세 보기" sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
-      {[['stage', '스테이징'], ['analysis', '종목분석'], ['chart', '차트']].map(([value, label]) => <Tab key={value} value={value} label={label} id={`unified-detail-${value}-tab`} aria-controls={`unified-detail-${value}-panel`} />)}
+    <Tabs value={tab} variant="scrollable" scrollButtons="auto" onChange={(_, value) => { setTab(value); if (value === 'ai') setAiVisited(true); if (contentRef.current) contentRef.current.scrollTop = 0; }} aria-label="종합분석 상세 보기" sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
+      {[['stage', '스테이징'], ['analysis', '종목분석'], ['chart', '차트'], ['ai', 'AI 판단']].map(([value, label]) => <Tab key={value} value={value} label={label} id={`unified-detail-${value}-tab`} aria-controls={`unified-detail-${value}-panel`} />)}
     </Tabs>
     <DialogContent ref={contentRef} sx={{ minHeight: 300 }}><Stack gap={2.5}>
       <Alert severity="info">선택한 실행에 저장된 분석 결과입니다. 차트 탭을 선택할 때 가격을 별도로 조회하며, 저장된 분석은 다시 실행하지 않습니다.</Alert>
@@ -43,8 +45,13 @@ function SavedDetail({ selection, onClose }) {
       {['stage', 'analysis', 'chart'].map(value => <Box key={value} role="tabpanel" id={`unified-detail-${value}-panel`} aria-labelledby={`unified-detail-${value}-tab`} hidden={tab !== value}>
         {state.data && tab === value && <UnifiedAnalysisResults data={state.data} saved section={value} />}
       </Box>)}
+      <Box role="tabpanel" id="unified-detail-ai-panel" aria-labelledby="unified-detail-ai-tab" hidden={tab !== 'ai'}>
+        {state.data && aiVisited && <UnifiedDecisionTab key={`${selection.runId}:${selection.code}`} runId={selection.runId} stockCode={selection.code} priceDate={state.data.result.priceDate} />}
+      </Box>
     </Stack></DialogContent>
-    <DialogActions><Button onClick={onClose}>닫기</Button></DialogActions>
+    <DialogActions>
+      <Button onClick={onClose}>닫기</Button>
+    </DialogActions>
   </Dialog>;
 }
 

@@ -5,8 +5,10 @@ import UnifiedAnalysisPage from './UnifiedAnalysisPage';
 import * as api from '../../api/unifiedAnalysisApi';
 import { unifiedAnalysisFixture } from '../../test/unifiedAnalysisFixtures';
 import StockChartPanel from '../../features/stock-chart/components/StockChartPanel';
+import * as decisions from '../../api/tradeDecisionApi';
 
 vi.mock('../../api/unifiedAnalysisApi');
+vi.mock('../../api/tradeDecisionApi', async original => ({ ...await original(), previewDecisionPlan: vi.fn().mockResolvedValue(null), previewSourcePlan: vi.fn().mockResolvedValue(null), getDecisionCapabilities: vi.fn(), findImportedSnapshot: vi.fn(), startSnapshot: vi.fn(), startDecision: vi.fn() }));
 vi.mock('../../features/stock-chart/components/StockChartPanel', () => ({ default: vi.fn(() => <div>가격 차트 영역</div>) }));
 const run = { runId: 'unified-1', market: 'ALL', baseDate: '2026-09-18', status: 'COMPLETED', total: 2, completed: 2, failed: 0, skipped: 0 };
 const item = { stockCode: '005930', stockName: '삼성전자', market: 'KOSPI', status: 'COMPLETED', priceDate: '2026-09-18', stage: 6,
@@ -19,6 +21,8 @@ describe('시장 전체 종합분석', () => {
     vi.resetAllMocks();
     api.listUnifiedRuns.mockResolvedValue([run]); api.getUnifiedItems.mockResolvedValue(page);
     api.getUnifiedDetail.mockResolvedValue(unifiedAnalysisFixture());
+    decisions.getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: true });
+    decisions.findImportedSnapshot.mockResolvedValue(null);
   });
   it('저장 결과를 조회하고 상세에서도 재분석하지 않는다', async () => {
     setup(); expect(await screen.findByText('삼성전자')).toBeInTheDocument();
@@ -63,6 +67,22 @@ describe('시장 전체 종합분석', () => {
     expect(await screen.findByRole('heading', { name: '종목 평가와 가격 구간' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '종목분석' })).toHaveAttribute('aria-selected', 'true');
     expect(StockChartPanel).not.toHaveBeenCalled();
+  });
+  it('AI 탭을 팝업 안에서 열고 탭 이동 후 입력을 유지하며 자동 AI 호출하지 않는다', async () => {
+    setup();await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
+    await screen.findByRole('heading', { name: '추세 구조' });
+    expect(decisions.getDecisionCapabilities).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: 'AI 판단' }));
+    expect(await screen.findByRole('button', { name: 'AI 상세 검토' })).toBeEnabled();
+    expect(screen.getByRole('tabpanel', { name: 'AI 판단' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('투자 기간 (거래일)'), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('tab', { name: '스테이징' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'AI 판단' }));
+    expect(screen.getByLabelText('투자 기간 (거래일)')).toHaveValue(20);
+    expect(decisions.findImportedSnapshot).toHaveBeenCalledTimes(1);
+    expect(decisions.startSnapshot).not.toHaveBeenCalled();expect(decisions.startDecision).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: '이 저장 결과로 AI 검토' })).not.toBeInTheDocument();
   });
   it('팝업을 다시 열면 기본 스테이징 탭으로 돌아온다', async () => {
     setup(); await screen.findByText('삼성전자');

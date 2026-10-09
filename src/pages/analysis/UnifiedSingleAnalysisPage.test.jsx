@@ -4,6 +4,12 @@ import UnifiedAnalysisPage from './UnifiedSingleAnalysisPage';
 import { analyzeUnifiedStock } from '../../api/unifiedAnalysisApi';
 import { unifiedAnalysisFixture } from '../../test/unifiedAnalysisFixtures';
 import StockChartPanel from '../../features/stock-chart/components/StockChartPanel';
+import { getDecisionCapabilities } from '../../api/tradeDecisionApi';
+import * as decisionApi from '../../api/tradeDecisionApi';
+
+vi.mock('../../api/tradeDecisionApi', async importOriginal => ({ ...await importOriginal(), previewDecisionPlan: vi.fn().mockResolvedValue(null), previewSourcePlan: vi.fn().mockResolvedValue(null), getDecisionCapabilities: vi.fn(),
+  startSnapshot: vi.fn(), getSnapshot: vi.fn(), listDecisions: vi.fn(), waitForJob: vi.fn(),
+}));
 
 vi.mock('../../api/unifiedAnalysisApi', () => ({ analyzeUnifiedStock: vi.fn() }));
 vi.mock('../../features/stock-chart/components/StockChartPanel', () => ({ default: vi.fn(() => <div>가격 차트 영역</div>) }));
@@ -20,7 +26,9 @@ async function choose(name) {
 }
 
 describe('UnifiedAnalysisPage', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); getDecisionCapabilities.mockResolvedValue({ enabled: false, aiConfigured: false });
+    decisionApi.listDecisions.mockResolvedValue({ items: [], hasMore: false });decisionApi.waitForJob.mockImplementation(async j => j);
+    sessionStorage.clear(); window.history.replaceState({}, '', '/unified-analysis/stock'); });
   it('실행 전 빈 화면과 종목 선택을 제공하고 자동 수집하지 않는다', () => {
     render(<UnifiedAnalysisPage />);
     expect(screen.getByRole('heading', { name: '종합분석' })).toBeInTheDocument();
@@ -79,5 +87,28 @@ describe('UnifiedAnalysisPage', () => {
     analyzeUnifiedStock.mockResolvedValueOnce(unifiedAnalysisFixture());
     fireEvent.click(screen.getByRole('button', { name: '다시 실행' }));
     await waitFor(() => expect(screen.getByText('72.5')).toBeInTheDocument());
+  });
+  it('저장 기능이 활성화되면 새 스냅샷을 만들고 AI 영역을 표시한다', async () => {
+    getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: false });
+    decisionApi.startSnapshot.mockResolvedValue({ id: 'saved-one', status: 'SUCCEEDED', result: { analysis: unifiedAnalysisFixture() } });
+    render(<UnifiedAnalysisPage />);await choose('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '종합분석 실행' }));
+    expect(await screen.findByText('AI 매매 판단')).toBeInTheDocument();
+    expect(analyzeUnifiedStock).not.toHaveBeenCalled();expect(window.location.search).toContain('snapshot=saved-one');
+  });
+  it('저장 주소를 열면 재분석 없이 스냅샷을 복원한다', async () => {
+    getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: false });
+    window.history.replaceState({}, '', '?snapshot=saved-one');
+    decisionApi.getSnapshot.mockResolvedValue({ id: 'saved-one', stockCode: '005930', status: 'SUCCEEDED', result: { analysis: unifiedAnalysisFixture() } });
+    render(<UnifiedAnalysisPage />);expect(await screen.findByText('72.5')).toBeInTheDocument();
+    expect(decisionApi.startSnapshot).not.toHaveBeenCalled();expect(analyzeUnifiedStock).not.toHaveBeenCalled();
+  });
+  it('전체 종합분석의 저장 항목을 추가 수집 없이 가져온다', async () => {
+    getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: false });
+    window.history.replaceState({}, '', '?sourceRun=run-one&stock=005930');
+    decisionApi.startSnapshot.mockResolvedValue({ id: 'imported-one', stockCode: '005930', status: 'SUCCEEDED', result: { analysis: unifiedAnalysisFixture() } });
+    render(<UnifiedAnalysisPage />);expect(await screen.findByText('AI 매매 판단')).toBeInTheDocument();
+    expect(decisionApi.startSnapshot).toHaveBeenCalledWith('005930', expect.any(String), expect.any(AbortSignal), { source: 'UNIFIED_RUN_ITEM', runId: 'run-one' });
+    expect(analyzeUnifiedStock).not.toHaveBeenCalled();
   });
 });
