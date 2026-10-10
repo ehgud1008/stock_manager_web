@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../api/tradeDecisionApi';
 import TradeDecisionPanel from './TradeDecisionPanel';
+import { defaultPreferences } from './decisionPreferences';
+const selectManual = () => { fireEvent.mouseDown(screen.getByLabelText('보유기간 결정')); fireEvent.click(screen.getByRole('option', { name: '기간 직접 지정' })); };
 
 vi.mock('../../api/tradeDecisionApi', async original => ({ ...await original(), previewDecisionPlan: vi.fn().mockResolvedValue(null), previewSourcePlan: vi.fn().mockResolvedValue(null),
   listDecisions: vi.fn(), getDecision: vi.fn(), startDecision: vi.fn(), reviseDecision: vi.fn(), waitForJob: vi.fn(),
@@ -52,10 +54,11 @@ describe('TradeDecisionPanel', () => {
     api.previewDecisionPlan.mockImplementation(async (id, body) => ({ priceDate: '2026-10-05', horizonPlan: {
       horizonTradingDays: body.horizonTradingDays, lookbackBars: 40, status: 'NO_RESISTANCE', reason: '상단 저항 확인 필요', metrics: {}, focus: '기간별 관측' }, comparisons: [] }));
     render(<TradeDecisionPanel snapshotId="snapshot-one" stockCode="005930" aiConfigured />);
+    selectManual();
     expect(await screen.findByText(/10거래일 가격 계획/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('투자 기간 (거래일)'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('매수 후 예상 보유기간 (거래일)'), { target: { value: '20' } });
     expect(await screen.findByText(/20거래일 가격 계획/)).toBeInTheDocument();
-    expect(api.previewDecisionPlan).toHaveBeenLastCalledWith('snapshot-one', { positionStatus: 'UNKNOWN', horizonTradingDays: 20 }, expect.any(AbortSignal));
+    expect(api.previewDecisionPlan).toHaveBeenLastCalledWith('snapshot-one', { positionStatus: 'UNKNOWN', horizonTradingDays: 20, preferences: defaultPreferences }, expect.any(AbortSignal));
     expect(api.startDecision).not.toHaveBeenCalled();expect(api.reviseDecision).not.toHaveBeenCalled();
   });
   it('기간 변경 전의 늦은 조회 응답을 화면에 덮어쓰지 않는다', async () => {
@@ -64,7 +67,7 @@ describe('TradeDecisionPanel', () => {
       .mockResolvedValue({ horizonPlan: { horizonTradingDays: 20, status: 'NO_SUPPORT', reason: '새 기간 계획', metrics: {} } });
     render(<TradeDecisionPanel snapshotId="snapshot-one" stockCode="005930" aiConfigured />);
     await waitFor(() => expect(api.previewDecisionPlan).toHaveBeenCalledTimes(1));
-    fireEvent.change(screen.getByLabelText('투자 기간 (거래일)'), { target: { value: '20' } });
+    selectManual();fireEvent.change(screen.getByLabelText('매수 후 예상 보유기간 (거래일)'), { target: { value: '20' } });
     expect(await screen.findByText('새 기간 계획')).toBeInTheDocument();
     resolveOld({ horizonPlan: { horizonTradingDays: 10, status: 'NO_SUPPORT', reason: '오래된 계획', metrics: {} } });
     await waitFor(() => expect(screen.queryByText('오래된 계획')).not.toBeInTheDocument());
@@ -86,6 +89,25 @@ describe('TradeDecisionPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'AI 상세 검토' }));
     expect(await screen.findByText('기간과 신호를 함께 검토한 결론입니다.')).toBeInTheDocument();
     expect(screen.getByText('첫 목표: 130원')).toBeInTheDocument();
-    expect(api.startDecision).toHaveBeenCalledWith('snapshot-one', { positionStatus: 'HELD', horizonTradingDays: 10, averageBuyPrice: 105, purchasedOn: '2026-10-01' }, expect.any(String), expect.any(AbortSignal));
+    expect(api.startDecision).toHaveBeenCalledWith('snapshot-one', { positionStatus: 'HELD', horizonTradingDays: null, preferences: defaultPreferences, averageBuyPrice: 105, purchasedOn: '2026-10-01' }, expect.any(String), expect.any(AbortSignal));
+  });
+  it('기간 기본값은 AI 제안이며 성향 합계 오류는 호출을 막고 확인 빈도는 프리셋에 덮이지 않는다', async () => {
+    api.startDecision.mockResolvedValue(result());render(<TradeDecisionPanel snapshotId="snapshot-one" stockCode="005930" aiConfigured />);
+    expect(screen.queryByLabelText('매수 후 예상 보유기간 (거래일)')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('공격적 비율 (%)'), { target: { value: '21' } });
+    expect(screen.getByRole('button', { name: 'AI 상세 검토' })).toBeDisabled();
+    fireEvent.mouseDown(screen.getByLabelText('확인 가능한 빈도'));fireEvent.click(screen.getByRole('option', { name: '가끔 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '공격적 기본값' }));
+    fireEvent.click(screen.getByRole('button', { name: 'AI 상세 검토' }));
+    await waitFor(() => expect(api.startDecision).toHaveBeenCalledWith('snapshot-one', expect.objectContaining({ horizonTradingDays: null, preferences: expect.objectContaining({ aggressive: 70, monitoring: 'OCCASIONAL' }) }), expect.any(String), expect.any(AbortSignal)));
+  });
+  it('새 형식의 저장 입력을 복원하고 성향 변경을 기존 답변과 구분한다', async () => {
+    const saved=result();saved.result.context={ positionStatus: 'NOT_HELD', horizonTradingDays: null, preferences: { ...defaultPreferences, monitoring: 'OCCASIONAL' } };
+    window.history.replaceState({}, '', '?snapshot=snapshot-one&decision=decision-one');api.getDecision.mockResolvedValue(saved);
+    render(<TradeDecisionPanel snapshotId="snapshot-one" stockCode="005930" aiConfigured />);
+    expect(await screen.findByText('신규 진입 대기')).toBeInTheDocument();expect(screen.getByLabelText('확인 가능한 빈도')).toHaveTextContent('가끔 확인');
+    expect(screen.queryByText(/입력 조건이 변경되었습니다/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '보수적 기본값' }));expect(screen.getByText(/입력 조건이 변경되었습니다/)).toBeInTheDocument();
+    expect(api.startDecision).not.toHaveBeenCalled();
   });
 });

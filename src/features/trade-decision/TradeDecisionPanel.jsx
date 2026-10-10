@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import SectionCard from '../../components/common/SectionCard';
 import * as api from '../../api/tradeDecisionApi';
 import DecisionPlanView, { MetricReferences } from './DecisionPlanView';
+import IndependentReviewView from './IndependentReviewView';
+import DecisionPreferencesForm from './DecisionPreferencesForm';
+import { defaultPreferences, normalizePreferences, preferencesValid, sameDecisionContext } from './decisionPreferences';
 
 const actions = { BUY: '매수 검토', SELL: '매도 검토', HOLD: '보유 유지', WAIT: '신규 진입 대기', UNDETERMINED: '판단 보류' };
 const conditions = { UPSIDE: '상승 시나리오', RANGE: '횡보 시나리오', DOWNSIDE: '하락 시나리오' };
@@ -15,6 +18,8 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
   const [savedSnapshotId, setSavedSnapshotId] = useState(snapshotId);
   const [position, setPosition] = useState('UNKNOWN');
   const [horizon, setHorizon] = useState(10);
+  const [horizonMode, setHorizonMode] = useState('AI_PROPOSED');
+  const [preferences, setPreferences] = useState(defaultPreferences);
   const [averageBuyPrice, setAverageBuyPrice] = useState('');
   const [purchasedOn, setPurchasedOn] = useState('');
   const [preview, setPreview] = useState({});
@@ -28,11 +33,11 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
   const [hasMore, setHasMore] = useState(false);
   const active = useRef(null);
   const pendingRequest = useRef(null);
-  const requestBody = { positionStatus: position, horizonTradingDays: Number(horizon),
+  const requestBody = { positionStatus: position, horizonTradingDays: horizonMode === 'AI_PROPOSED' ? null : Number(horizon), preferences,
     ...(position === 'HELD' && averageBuyPrice !== '' ? { averageBuyPrice: Number(averageBuyPrice) } : {}),
     ...(position === 'HELD' && purchasedOn ? { purchasedOn } : {}) };
   const contextKey = JSON.stringify(requestBody);
-  const validInput = Number.isInteger(Number(horizon)) && Number(horizon) >= 1 && Number(horizon) <= 60
+  const validInput = (horizonMode === 'AI_PROPOSED' || Number.isInteger(Number(horizon)) && Number(horizon) >= 1 && Number(horizon) <= 252) && preferencesValid(preferences)
     && (position !== 'HELD' || averageBuyPrice === '' || (Number(averageBuyPrice) > 0 && /^\d+(\.\d{1,2})?$/.test(averageBuyPrice)));
   useEffect(() => {
     if (!validInput || (!sourceRunId && !savedSnapshotId)) return;
@@ -49,6 +54,10 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
     return () => { clearTimeout(timer); c.abort(); };
   }, [contextKey, validInput, savedSnapshotId, stockCode, sourceRunId, previewRetry]);
   const previewPolicy = preview.key === contextKey ? preview.data : null;
+  const restoreContext = context => {
+    setPosition(context.positionStatus); setHorizonMode(context.horizonTradingDays == null ? 'AI_PROPOSED' : 'FIXED'); setHorizon(context.horizonTradingDays ?? 10);
+    setPreferences(normalizePreferences(context.preferences));setAverageBuyPrice(context.averageBuyPrice == null ? '' : String(context.averageBuyPrice));setPurchasedOn(context.purchasedOn || '');
+  };
 
   const refresh = useCallback(async signal => {
     if (embedded && !effectiveSnapshot.current) { setHistory([]); setHasMore(false); return; }
@@ -75,7 +84,7 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
     restored.then(j => {
       if (j && !c.signal.aborted) {
         const context = j.context || j.result?.context;
-        if (context) { setPosition(context.positionStatus); setHorizon(context.horizonTradingDays); setAverageBuyPrice(context.averageBuyPrice == null ? '' : String(context.averageBuyPrice)); setPurchasedOn(context.purchasedOn || ''); }
+        if (context) restoreContext(context);
         return track(j, c.signal);
       }
     })
@@ -96,7 +105,7 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
       if (mode === 'open') {
         initial = await api.getDecision(id, c.signal);
         const context = initial.context || initial.result?.context;
-        if (context && !c.signal.aborted) { setPosition(context.positionStatus); setHorizon(context.horizonTradingDays); setAverageBuyPrice(context.averageBuyPrice == null ? '' : String(context.averageBuyPrice)); setPurchasedOn(context.purchasedOn || ''); }
+        if (context && !c.signal.aborted) restoreContext(context);
       }
       else {
         if (!effectiveSnapshot.current) {
@@ -107,14 +116,14 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
         const currentSnapshot = effectiveSnapshot.current;
         const signature = JSON.stringify({ mode, id, body, snapshotId: currentSnapshot });
         if (pendingRequest.current?.signature !== signature) pendingRequest.current = {
-          signature, key: api.requestIdentity(`trade-decision-request-v2:${currentSnapshot}`, { mode, id, body }),
+          signature, key: api.requestIdentity(`trade-decision-request-v4:${currentSnapshot}`, { mode, id, body }),
         };
         const key = pendingRequest.current.key;
         initial = mode === 'revision' ? await api.reviseDecision(id, key, c.signal)
           : await api.startDecision(currentSnapshot, body, key, c.signal);
         if (!c.signal.aborted && !embedded) api.updateDecisionLocation(currentSnapshot, initial.id);
         pendingRequest.current = null;
-        if (mode === 'revision') { try { sessionStorage.removeItem(`trade-decision-request-v2:${currentSnapshot}`); } catch { /* Browser storage can be unavailable. */ } }
+        if (mode === 'revision') { try { sessionStorage.removeItem(`trade-decision-request-v4:${currentSnapshot}`); } catch { /* Browser storage can be unavailable. */ } }
       }
       if (!c.signal.aborted) await track(initial, c.signal);
     } catch (e) { if (!c.signal.aborted) setError(e.message); }
@@ -124,41 +133,45 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
   const policy = result?.policy;
   const review = result?.aiReview;
   const plan = policy?.plan;
-  return <SectionCard title="AI 매매 판단" caption="저장된 분석과 보유 조건을 검토합니다. 같은 입력은 확정된 판단을 재사용합니다.">
+  return <SectionCard title="AI 매매 판단" caption="AI가 저장 자료를 독립적으로 해석하고 엔진과 다른 판단·가격 전략을 제안할 수 있습니다. 같은 입력은 저장 결과를 재사용합니다.">
     <Stack gap={2}>
       {!aiConfigured && <Alert severity="info">AI 모델 또는 API 키가 아직 설정되지 않았습니다. 저장된 분석과 판단 이력은 조회할 수 있습니다.</Alert>}
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField select label="보유 상태" value={position} onChange={e => setPosition(e.target.value)} disabled={busy} sx={{ minWidth: 180 }}>
           <MenuItem value="UNKNOWN">선택하지 않음</MenuItem><MenuItem value="NOT_HELD">미보유</MenuItem><MenuItem value="HELD">보유 중</MenuItem>
         </TextField>
-        <TextField type="number" label={position === 'HELD' ? '잔여 보유기간 (거래일)' : '투자 기간 (거래일)'} value={horizon} onChange={e => setHorizon(e.target.value)} disabled={busy} inputProps={{ min: 1, max: 60 }} />
-        <Button variant="contained" disabled={busy || !aiConfigured || !validInput || ['HISTORY_REQUIRED', 'HISTORY_INVALID', 'HISTORY_INSUFFICIENT'].includes(previewPolicy?.blockReason)} onClick={() => execute()}>AI 상세 검토</Button>
+        <TextField select label="보유기간 결정" value={horizonMode} onChange={e => setHorizonMode(e.target.value)} disabled={busy} sx={{ minWidth: 190 }}><MenuItem value="AI_PROPOSED">AI가 적합한 기간 제안</MenuItem><MenuItem value="FIXED">기간 직접 지정</MenuItem></TextField>
+        {horizonMode === 'FIXED' && <TextField type="number" label={position === 'HELD' ? '앞으로 더 보유할 기간 (거래일)' : '매수 후 예상 보유기간 (거래일)'} value={horizon} onChange={e => setHorizon(e.target.value)} disabled={busy} inputProps={{ min: 1, max: 252 }} />}
+        <Button variant="contained" disabled={busy || !aiConfigured || !validInput || ['HISTORY_REQUIRED', 'HISTORY_INVALID'].includes(previewPolicy?.blockReason)} onClick={() => execute()}>AI 상세 검토</Button>
       </Stack>
+      <DecisionPreferencesForm value={preferences} onChange={setPreferences} disabled={busy} />
       {position === 'HELD' && <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField type="number" label="평균 매수가 (선택)" value={averageBuyPrice} onChange={e => setAverageBuyPrice(e.target.value)} disabled={busy} inputProps={{ min: 0.01, step: 0.01 }} />
         <TextField type="date" label="매수일 (선택)" value={purchasedOn} onChange={e => setPurchasedOn(e.target.value)} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ max: previewPolicy?.priceDate }} />
       </Stack>}
-      <Typography variant="caption" color="text.secondary">기간을 바꾸면 저장 자료로 가격 계획을 비교합니다. AI는 상세 검토 버튼을 눌렀을 때만 호출합니다.</Typography>
+      <Typography variant="caption" color="text.secondary">AI가 종목 자체의 적합성을 먼저 분석한 뒤 내 성향을 반영합니다. 새 분석은 두 단계 AI 호출을 사용하며, 입력 변경만으로 AI를 호출하지 않습니다.</Typography>
+      {horizonMode === 'AI_PROPOSED' && <Typography variant="caption" color="text.secondary">아래 엔진의 기간별 계획은 비교 참고용이며, AI가 제안할 보유기간을 미리 정하지 않습니다.</Typography>}
       {preview.key === contextKey && preview.loading && <LinearProgress aria-label="기간별 가격 계획 계산 중" />}
       {preview.key === contextKey && preview.error && <Alert severity="warning" action={<Button onClick={() => setPreviewRetry(n => n + 1)}>계획 다시 조회</Button>}>가격 계획 조회 실패: {preview.error}</Alert>}
-      {validInput && previewPolicy && <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 2, p: 2 }}><Typography variant="overline">현재 입력의 가격 계획 · AI 호출 없음</Typography><DecisionPlanView policy={previewPolicy} onSelectPeriod={busy ? undefined : setHorizon} /></Box>}
+      {validInput && previewPolicy && <Accordion disableGutters defaultExpanded={!review}><AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography>현재 입력의 엔진 참고 계획 · AI 호출 없음</Typography></AccordionSummary><AccordionDetails><DecisionPlanView policy={previewPolicy} onSelectPeriod={busy ? undefined : days => { setHorizon(days); setHorizonMode('FIXED'); }} /></AccordionDetails></Accordion>}
       {busy && <Box role="status"><LinearProgress /><Typography variant="body2" mt={1}>저장된 작업을 확인하고 있습니다. 화면을 닫아도 서버 작업은 유지됩니다.</Typography></Box>}
       {error && <Alert severity="error">{error}</Alert>}
       {job?.status === 'FAILED' && <Alert severity="error">{api.decisionErrorMessage(job.errorCode)}</Alert>}
       {job?.status === 'RETRYABLE_FAILED' && <Alert severity="warning">일시적인 오류로 자동 재시도를 기다리고 있습니다.</Alert>}
       {result && <Stack gap={1.5}>
         <Divider />
-        <Stack direction="row" gap={1} flexWrap="wrap"><Chip color="primary" label={actions[result.finalAction] || '판단 보류'} /><Chip variant="outlined" label={result.generationMode === 'AI_REVIEWED' ? 'AI 검토 완료' : '자료 확인 필요'} /><Chip variant="outlined" label="승률 미검증" /></Stack>
-        <Typography variant="body2">판단 입력: {result.context?.positionStatus === 'HELD' ? '보유 중' : result.context?.positionStatus === 'NOT_HELD' ? '미보유' : '보유 미입력'} · {result.context?.horizonTradingDays}거래일 · 가격일 {policy?.priceDate}</Typography>
-        {(result.context?.horizonTradingDays !== Number(horizon) || result.context?.positionStatus !== position
-          || Number(result.context?.averageBuyPrice || 0) !== Number(requestBody.averageBuyPrice || 0) || (result.context?.purchasedOn || '') !== (requestBody.purchasedOn || ''))
+        <Stack direction="row" gap={1} flexWrap="wrap"><Chip color="primary" label={result.finalAction === 'BUY' && result.context?.positionStatus === 'HELD' ? '추가 매수 검토' : actions[result.finalAction] || '판단 보류'} /><Chip variant="outlined" label={result.generationMode === 'AI_REVIEWED' ? 'AI 검토 완료' : '자료 확인 필요'} /><Chip variant="outlined" label="승률 미검증" /></Stack>
+        <Typography variant="body2">판단 입력: {result.context?.positionStatus === 'HELD' ? '보유 중' : result.context?.positionStatus === 'NOT_HELD' ? '미보유' : '보유 미입력'} · {result.context?.horizonTradingDays == null ? 'AI가 기간 제안' : `${result.context.horizonTradingDays}거래일 직접 지정`} · 가격일 {policy?.priceDate}</Typography>
+        {!sameDecisionContext(result.context, requestBody)
           && <Alert severity="info">입력 조건이 변경되었습니다. 아래 AI 답변은 표시된 기존 판단 입력의 결과입니다. 새 조건으로 상세 검토를 요청하세요.</Alert>}
         {!policy?.horizonPlan && <Alert severity="info">이전 형식으로 저장된 판단입니다. 기간별 상세 분석은 새 평가에서 확인할 수 있습니다.</Alert>}
         {policy?.blockReason && <Alert severity="info">{blocks[policy.blockReason] || policy.blockReason}</Alert>}
-        {policy?.horizonPlan ? <DecisionPlanView policy={policy} /> : <><Typography>진입 {plan ? `${format(plan.entryFrom)} ~ ${format(plan.entryTo)}` : '산출 불가'}</Typography>
+        {review?.independent && <IndependentReviewView result={result} />}
+        {review && !review.independent && <Alert severity="info">이전 방식의 엔진 기반 AI 검토입니다. 독립 분석을 받으려면 같은 입력 새 평가를 실행하세요.</Alert>}
+        {!review?.independent && (policy?.horizonPlan ? <DecisionPlanView policy={policy} /> : <><Typography>진입 {plan ? `${format(plan.entryFrom)} ~ ${format(plan.entryTo)}` : '산출 불가'}</Typography>
         <Typography>목표 {plan?.targets?.map(format).join(' / ') || '산출 불가'} · 손절 {format(plan?.stopLoss)}</Typography>
-        <Typography variant="body2">첫 목표 손익비 {policy?.rewardRisk == null ? '산출 불가' : `${Number(policy.rewardRisk).toFixed(2)}배`} · 비용 미반영</Typography></>}
-        {review && <>
+        <Typography variant="body2">첫 목표 손익비 {policy?.rewardRisk == null ? '산출 불가' : `${Number(policy.rewardRisk).toFixed(2)}배`} · 비용 미반영</Typography></>)}
+        {review && !review.independent && <>
           {review.detail && [['conclusion', '종합 판단'], ['horizonAssessment', '선택 기간의 적합성'], ['entryPlan', '진입 조건과 취소 기준'], ['exitPlan', '목표·손절과 청산 기준'], ['timeReview', '기간 경과 후 재검토']].map(([field, label]) => <Box key={field}>
             <Typography fontWeight={700}>{label}</Typography><Typography variant="body2" sx={{ whiteSpace: 'pre-line', my: 0.5 }}>{review.detail[field]?.text}</Typography>
             <MetricReferences ids={review.detail[field]?.metricIds} metrics={policy.metrics} />

@@ -76,10 +76,11 @@ describe('시장 전체 종합분석', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'AI 판단' }));
     expect(await screen.findByRole('button', { name: 'AI 상세 검토' })).toBeEnabled();
     expect(screen.getByRole('tabpanel', { name: 'AI 판단' })).toBeVisible();
-    fireEvent.change(screen.getByLabelText('투자 기간 (거래일)'), { target: { value: '20' } });
+    fireEvent.mouseDown(screen.getByLabelText('보유기간 결정'));fireEvent.click(screen.getByRole('option', { name: '기간 직접 지정' }));
+    fireEvent.change(screen.getByLabelText('매수 후 예상 보유기간 (거래일)'), { target: { value: '20' } });
     fireEvent.click(screen.getByRole('tab', { name: '스테이징' }));
     fireEvent.click(screen.getByRole('tab', { name: 'AI 판단' }));
-    expect(screen.getByLabelText('투자 기간 (거래일)')).toHaveValue(20);
+    expect(screen.getByLabelText('매수 후 예상 보유기간 (거래일)')).toHaveValue(20);
     expect(decisions.findImportedSnapshot).toHaveBeenCalledTimes(1);
     expect(decisions.startSnapshot).not.toHaveBeenCalled();expect(decisions.startDecision).not.toHaveBeenCalled();
     expect(screen.queryByRole('link', { name: '이 저장 결과로 AI 검토' })).not.toBeInTheDocument();
