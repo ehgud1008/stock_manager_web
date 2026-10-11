@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import IndependentReviewView from './IndependentReviewView';
 
@@ -18,7 +18,11 @@ function result() {
 describe('IndependentReviewView', () => {
   it('엔진 대기와 AI 매수를 구분하고 전망 가격·재계산 손익비·각 보유자 대응을 표시한다', () => {
     render(<IndependentReviewView result={result()} />);
-    expect(screen.getByText('엔진: 진입 대기 · AI: 매수 검토')).toBeInTheDocument();
+    const comparison = within(screen.getByRole('table', { name: '엔진과 AI 좌우 비교' }));
+    expect(comparison.getByRole('columnheader', { name: '엔진 분석' })).toBeInTheDocument();
+    expect(comparison.getByRole('columnheader', { name: 'AI 분석' })).toBeInTheDocument();
+    expect(comparison.getByText('진입 대기')).toBeInTheDocument();
+    expect(comparison.getByText('매수 검토')).toBeInTheDocument();
     expect(screen.getByText('엔진과 다른 판단')).toBeInTheDocument();expect(screen.getByText('가정한 전망')).toBeInTheDocument();
     expect(screen.getByText('1차 목표 110원')).toBeInTheDocument();expect(screen.getByText('1차 목표 상승 여력 10% · 손익비 2배')).toBeInTheDocument();
     expect(screen.getByText('신규 진입자: 진입을 검토합니다.')).toBeInTheDocument();expect(screen.getByText('보유자: 지지 유지 시 보유합니다.')).toBeInTheDocument();
@@ -28,7 +32,7 @@ describe('IndependentReviewView', () => {
     const saved = result();saved.context.positionStatus = 'HELD';saved.strategyCalculations[0].referenceKind = 'CURRENT_PRICE';saved.strategyCalculations[0].costBasisReturnPct = 25;
     saved.aiReview.independent.strategies[0].entryHigh = { value: 100, kind: 'OBSERVED', sourcePath: '/marketData/candles/0/4', adjustmentPct: null, basis: '확정 종가입니다.' };
     render(<IndependentReviewView result={saved} />);
-    expect(screen.getByText('엔진: 진입 대기 · AI: 추가 매수 검토')).toBeInTheDocument();
+    expect(within(screen.getByRole('table', { name: '엔진과 AI 좌우 비교' })).getByText('추가 매수 검토')).toBeInTheDocument();
     expect(screen.getByText(/기준: 2026-10-09 종가 100원/)).toBeInTheDocument();
     expect(screen.getByText('매수가 대비 평가손익 25%')).toBeInTheDocument();
   });

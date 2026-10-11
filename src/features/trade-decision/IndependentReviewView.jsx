@@ -2,8 +2,8 @@ import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, Stack,
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import DecisionPlanView, { MetricReferences } from './DecisionPlanView';
 import SuitabilityView from './SuitabilityView';
+import EngineAiComparison from './EngineAiComparison';
 
-const actions = { BUY: '매수 검토', SELL: '매도 검토', HOLD: '보유 유지', WAIT: '진입 대기', UNDETERMINED: '판단 유보' };
 const strength = { ASSERTIVE: '적극적', CONDITIONAL: '조건부', CAUTIOUS: '보수적' };
 const alignment = { AGREE: '엔진과 동의', PARTIAL: '엔진과 부분 동의', DISAGREE: '엔진과 다른 판단' };
 const kinds = { OBSERVED: '관측 가격', CALCULATED: '계산 참고선', PROJECTION: '가정한 전망' };
@@ -42,7 +42,7 @@ export default function IndependentReviewView({ result }) {
     <Stack direction="row" gap={1} flexWrap="wrap"><Chip label="AI 독립 분석" color="primary" variant="outlined" /><Chip label={`판단 태도: ${strength[independent.strength]}`} /><Chip label={alignment[independent.alignment]} /></Stack>
     <Typography variant="caption" color="text.secondary">판단 태도는 성공 확률이 아닙니다. 가격의 근거 참조와 산술을 검사했으며, 전망이나 해석의 정확성을 검증한 것은 아닙니다.</Typography>
     <Explanation title="AI 핵심 판단" value={review.detail?.conclusion} policy={policy} />
-    <Box><Typography fontWeight={700}>엔진과 AI 비교</Typography><Typography variant="body2">엔진: {actions[policy.engineAssessment] || '판단 유보'} · AI: {result.finalAction === 'BUY' && result.context?.positionStatus === 'HELD' ? '추가 매수 검토' : actions[result.finalAction]}</Typography>
+    <Box><EngineAiComparison result={result} />
       <Explanation title="일치·충돌 근거" value={independent.engineComparison} policy={policy} /></Box>
     <Typography variant="h6">AI 제안 가격 전략</Typography>
     {!independent.strategies.length && <Alert severity="info">AI 가격 전략 미제시: {independent.strategyOmissionReason || '제안할 근거가 부족합니다. 누락 정보와 조건을 확인하세요.'}</Alert>}
