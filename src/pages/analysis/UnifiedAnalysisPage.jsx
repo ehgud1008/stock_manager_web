@@ -4,19 +4,21 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, LinearProgress, MenuItem,
   Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import * as api from '../../api/unifiedAnalysisApi';
 import SectionCard from '../../components/common/SectionCard';
 import UnifiedAnalysisResults from '../../features/unified-analysis/UnifiedAnalysisResults';
+import DailyReportPanel from '../../features/unified-analysis/DailyReportPanel';
 import UnifiedDecisionTab from '../../features/trade-decision/UnifiedDecisionTab';
 import { STAGES } from '../../features/screener/screenerModel';
 
-const STATUS = { READY: '실행 대기', RUNNING: '분석 중', COMPLETED: '완료', COMPLETED_WITH_ERRORS: '일부 실패', FAILED: '실패', INTERRUPTED: '중단', PENDING: '미처리', SKIPPED: '제외' };
+const STATUS = { READY: '실행 대기', WAITING_DATA: '마감 자료 대기', RETRY_WAIT: '확인·재시도 대기', DATA_UNAVAILABLE: '당일 자료 부족', RUNNING: '분석 중', COMPLETED: '완료', COMPLETED_WITH_ERRORS: '일부 확인 실패', FAILED: '실패', INTERRUPTED: '복구 대기', PENDING: '미처리', SKIPPED: '제외' };
 const SIGNAL = { BUY: '매수 확정·유지', SELL: '보유 시 매도 확정·유지', BREAKOUT: '돌파', PULLBACK_RECOVERY: '눌림 회복', BREAKOUT_RETEST: '돌파 재지지', TREND_BREAKDOWN: '추세 훼손', BREAKOUT_FAILURE: '돌파 실패' };
 const ENTRY = { IN_RANGE: '진입 구간 내', CHASE_BLOCKED: '추격 보류', OUTSIDE_ENTRY_ZONE: '진입 구간 이탈', SCENARIO_UNAVAILABLE: '시나리오 없음', SELL_SIGNAL_CONFLICT: '매도 신호 충돌', NONE: '유효 매수 신호 없음' };
 const QUALITY = { COMPLETE: '정상', PARTIAL: '일부 확인 필요', INVALID: '판정 불가' };
 const initialFilters = { search: '', market: '', minVolume: '', minTradingAmountEok: '', stage: '', transition: '', allSlopesUp: '', maxBarsSinceTransition: '', signal: '', entryStatus: '', quality: '', status: '', minScore: '', maxScore: '', minRewardRisk: '', sort: 'totalScore', ascending: false };
-const running = run => ['READY', 'RUNNING'].includes(run?.status);
+const running = run => ['READY', 'RUNNING', 'WAITING_DATA', 'RETRY_WAIT'].includes(run?.status) || (run?.eod && run.status === 'INTERRUPTED');
+const koreanTime = value => value == null ? '—' : new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false });
 const number = (value, digits = 1) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits });
 
 function SavedDetail({ selection, onClose }) {
@@ -36,10 +38,13 @@ function SavedDetail({ selection, onClose }) {
   return <Dialog open fullWidth maxWidth="lg" onClose={onClose} aria-labelledby="unified-detail-title">
     <DialogTitle id="unified-detail-title">{selection.name} · 종합분석 상세</DialogTitle>
     <Tabs value={tab} variant="scrollable" scrollButtons="auto" onChange={(_, value) => { setTab(value); if (value === 'ai') setAiVisited(true); if (contentRef.current) contentRef.current.scrollTop = 0; }} aria-label="종합분석 상세 보기" sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
-      {[['stage', '스테이징'], ['analysis', '종목분석'], ['chart', '차트'], ['ai', 'AI 판단']].map(([value, label]) => <Tab key={value} value={value} label={label} id={`unified-detail-${value}-tab`} aria-controls={`unified-detail-${value}-panel`} />)}
+      {[['stage', '스테이징'], ['analysis', '종목분석'], ['chart', '차트'], ['ai', '뉴스·업황']].map(([value, label]) => <Tab key={value} value={value} label={label} id={`unified-detail-${value}-tab`} aria-controls={`unified-detail-${value}-panel`} />)}
     </Tabs>
     <DialogContent ref={contentRef} sx={{ minHeight: 300 }}><Stack gap={2.5}>
       <Alert severity="info">선택한 실행에 저장된 분석 결과입니다. 차트 탭을 선택할 때 가격을 별도로 조회하며, 저장된 분석은 다시 실행하지 않습니다.</Alert>
+      {state.data?.eod && <Alert severity="info">가격 기준: 키움 KRX 수정 일봉 · 거래일 {state.data.eod.tradeDate}<br />
+        마감 자료 확인 기준 {koreanTime(state.data.eod.priceCutoffAt)} · 실제 수집 {koreanTime(state.data.eod.collectedAt)}<br />
+        마감 대기 후 두 차례 일봉 이력 일치로 확인했습니다. 제공사 확정 플래그가 없어 이후 정정될 수 있습니다.</Alert>}
       {state.loading && <LinearProgress aria-label="상세 조회 중" />}
       {state.error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(n => n + 1)}>다시 조회</Button>}>{state.error}</Alert>}
       {['stage', 'analysis', 'chart'].map(value => <Box key={value} role="tabpanel" id={`unified-detail-${value}-panel`} aria-labelledby={`unified-detail-${value}-tab`} hidden={tab !== value}>
@@ -56,8 +61,9 @@ function SavedDetail({ selection, onClose }) {
 }
 
 export default function UnifiedAnalysisPage() {
+  const [searchParams] = useSearchParams();
   const [runs, setRuns] = useState([]);
-  const [runId, setRunId] = useState('');
+  const [runId, setRunId] = useState(() => /^[0-9a-f-]{36}$/i.test(searchParams.get('runId') || '') ? searchParams.get('runId') : '');
   const [market, setMarket] = useState('ALL');
   const [draft, setDraft] = useState(initialFilters);
   const [filters, setFilters] = useState(initialFilters);
@@ -92,7 +98,7 @@ export default function UnifiedAnalysisPage() {
         const data = await api.getUnifiedItems(runId, params, controller.signal);
         if (controller.signal.aborted) return;
         setResult(data); setLoading(false);
-        setRuns(old => old.map(run => run.runId === data.run.runId ? data.run : run));
+        setRuns(old => old.some(run => run.runId === data.run.runId) ? old.map(run => run.runId === data.run.runId ? data.run : run) : [data.run, ...old]);
         if (running(data.run)) timer = setTimeout(load, 3000);
       } catch (e) { if (!controller.signal.aborted) { setError(e.message); setLoading(false); } }
     };
@@ -130,7 +136,7 @@ export default function UnifiedAnalysisPage() {
         <Typography color="text.secondary" mt={1}>시장 전체의 추세와 매매 조건을 함께 분석하고, 원하는 종목을 찾아보세요.</Typography></Box>
       <Button component={Link} to="/unified-analysis/stock" sx={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>개별 종합분석</Button>
     </Stack>
-    <SectionCard title="시장 전체 분석" caption="전일까지의 확정 일봉을 기준으로 국내 일반주식을 분석합니다.">
+    <SectionCard title="시장 전체 분석" caption="한국시간 20시 이후 분석 가능한 거래일의 국내 일반주식을 분석합니다. 마감 자료를 확인한 뒤 결과를 저장합니다.">
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField select size="small" label="분석 대상 시장" value={market} disabled={busy} onChange={e => setMarket(e.target.value)} sx={{ minWidth: 180 }}>
           <MenuItem value="ALL">코스피 + 코스닥</MenuItem><MenuItem value="KOSPI">코스피</MenuItem><MenuItem value="KOSDAQ">코스닥</MenuItem>
@@ -140,6 +146,7 @@ export default function UnifiedAnalysisPage() {
       </Stack>
       <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>완료된 종목부터 결과를 확인할 수 있습니다. 브라우저를 닫아도 서버에서 계속 실행됩니다.</Typography>
     </SectionCard>
+    {run && <Alert severity="info">선택한 결과는 {run.baseDate} {run.eod ? '거래일' : '기준일'} 기준입니다. 최신 실행이 대기 중이면 분석 완료 후 결과를 확인하세요.</Alert>}
     {error && <Alert severity="error">{error}</Alert>}
     <TextField select label="분석 실행 이력" value={runId} disabled={busy} onChange={e => { setRunId(e.target.value); setPage(0); setSelection(null); }}>
       {!runs.length && <MenuItem value="">저장된 실행 없음</MenuItem>}
@@ -149,13 +156,20 @@ export default function UnifiedAnalysisPage() {
       <Grid container spacing={2}>{[['대상 종목', run.total], ['분석 완료', run.completed], ['실패', run.failed], ['제외', run.skipped]].map(([label, value]) => <Grid key={label} size={3}>
         <Typography color="text.secondary" variant="caption">{label}</Typography><Typography sx={{ fontSize: { xs: 24, md: 32 }, fontWeight: 650 }}>{number(value, 0)}</Typography>
       </Grid>)}</Grid>
-      <LinearProgress sx={{ my: 2, height: 5, borderRadius: 4 }} aria-label="종합분석 진행률" variant={run.total ? 'determinate' : running(run) ? 'indeterminate' : 'determinate'} value={run.total ? 100 * (run.completed + run.failed + run.skipped) / run.total : 0} />
+      <LinearProgress sx={{ my: 2, height: 5, borderRadius: 4 }} aria-label="종합분석 진행률" variant={run.total ? 'determinate' : running(run) ? 'indeterminate' : 'determinate'} value={run.total ? 100 * (run.completed + run.failed + run.skipped + (run.eod?.dataUnavailable || 0)) / run.total : 0} />
+      {run.eod && <Stack gap={0.5} sx={{ mb: 1.5 }}>
+        <Typography variant="body2">가격 기준: 키움 KRX 수정 일봉 · 자료 확인 기준 {koreanTime(run.eod.priceCutoffEpoch)}</Typography>
+        <Typography variant="body2">미처리 {number(run.eod.pending, 0)} · 확인·재시도 대기 {number(run.eod.retrying, 0)} · 당일 자료 부족 {number(run.eod.dataUnavailable, 0)}</Typography>
+        <Typography variant="caption">수집 가능 시각 {koreanTime(run.eod.eligibleEpoch)} · 실행 기한 {koreanTime(run.eod.deadlineEpoch)} · 자동 복구 {number(run.eod.recoveryCount, 0)}회</Typography>
+        {run.eod.recoveryCount > 0 && running(run) && <Typography variant="body2">저장된 목록에서 완료 종목을 보존하며 이어서 처리하고 있습니다.</Typography>}
+      </Stack>}
       <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center"><Typography variant="caption" color="text.secondary">기준일 {run.baseDate} · 실제 가격일은 종목별로 확인하세요.</Typography>
         {!running(run) && run.status !== 'COMPLETED' && <Button size="small" disabled={busy || activeRun} onClick={() => setConfirm('resume')}>실패·미처리 재개</Button>}
         {running(run) && <Button size="small" disabled={busy} onClick={() => setConfirm('recover')}>중단 상태 정리</Button>}
       </Stack>
-      {run.errorCode && <Alert severity="warning" sx={{ mt: 1 }}>실행이 중단되었습니다. 실패·미처리 재개를 이용하거나 새로 실행하세요. ({run.errorCode})</Alert>}
+      {run.errorCode && <Alert severity={running(run) ? 'info' : 'warning'} sx={{ mt: 1 }}>{running(run) ? '자료 확인 또는 자동 복구를 기다리고 있습니다.' : '실행 결과를 확인하세요. 재시도 가능한 항목이 없거나 실행 기한이 지나면 새 분석이 필요합니다.'} ({run.errorCode})</Alert>}
     </SectionCard>}
+    {run?.eod && <DailyReportPanel key={runId} runId={runId} onDetail={stock => setSelection({ runId, code: stock.code, name: stock.name })} />}
     <SectionCard title="결과 검색" caption="스테이지와 점수·신호 조건을 함께 적용합니다.">
       <Box component="form" onSubmit={e => { e.preventDefault(); setFilters({ ...draft }); setPage(0); }}><Stack gap={1.5}>
         <Stack direction="row" gap={1.5} flexWrap="wrap">
@@ -172,7 +186,7 @@ export default function UnifiedAnalysisPage() {
         <Typography variant="caption" color="text.secondary">거래량·거래대금은 종목별 분석 가격일 기준입니다. 입력값 이상을 검색하며, 값이 미저장·미확인인 기존 결과는 해당 최소값 조건에서 제외됩니다. 결과 시장은 선택한 실행 안에서만 검색합니다.</Typography>
         <Stack direction="row" gap={1.5} flexWrap="wrap">
           {['minScore', 'maxScore', 'minRewardRisk', 'maxBarsSinceTransition'].map((key, i) => <TextField key={key} size="small" type="number" label={['최소 점수', '최대 점수', '최소 손익비', '전환 후 최대 봉 수'][i]} value={draft[key]} onChange={e => change(key, e.target.value)} sx={{ width: 140, flexGrow: 1 }} slotProps={{ htmlInput: { min: 0, max: i < 2 ? 100 : undefined, step: i === 3 ? 1 : 'any' } }} />)}
-          {select('status', '처리 상태', { COMPLETED: '완료', FAILED: '실패', PENDING: '미처리', SKIPPED: '제외' })}
+          {select('status', '처리 상태', { COMPLETED: '완료', FAILED: '실패', PENDING: '미처리', RETRY_WAIT: '확인·재시도 대기', DATA_UNAVAILABLE: '당일 자료 부족', SKIPPED: '제외' })}
           {select('quality', '데이터 상태', QUALITY)}
         </Stack>
         <Stack direction="row" gap={1.5} flexWrap="wrap">

@@ -7,7 +7,7 @@ import SectionCard from '../../components/common/SectionCard';
 import useStockMaster from '../../features/stock-search/hooks/useStockMaster';
 import { searchStockMaster } from '../../features/stock-search/services/stockMasterService';
 import UnifiedAnalysisResults from '../../features/unified-analysis/UnifiedAnalysisResults';
-import TradeDecisionPanel from '../../features/trade-decision/TradeDecisionPanel';
+import NewsInsightsPanel from '../../features/trade-decision/NewsInsightsPanel';
 import * as decisions from '../../api/tradeDecisionApi';
 
 export default function UnifiedSingleAnalysisPage() {
@@ -115,12 +115,12 @@ export default function UnifiedSingleAnalysisPage() {
       <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>현재가는 마지막 확정 종가로 평가합니다. {capabilities?.enabled ? '분석 결과를 저장하며, AI 검토는 분석 완료 후 별도로 요청할 수 있습니다.' : '결과는 이 화면에서만 유지되며, 다시 실행하면 새로 수집합니다.'}</Typography>
     </SectionCard>
     {capabilityError && <Alert severity="warning">저장 분석 설정을 확인하지 못했습니다: {capabilityError}. 기본 종목 분석을 사용할 수 있습니다.</Alert>}
-    {capabilities && !capabilities.enabled && !capabilityError && <Alert severity="info">AI 매매 판단은 서버의 저장 분석 기능을 활성화한 후 사용할 수 있습니다.</Alert>}
+    {capabilities && !capabilities.enabled && !capabilityError && <Alert severity="info">뉴스·업황 인사이트는 서버의 저장 분석 기능을 활성화한 후 사용할 수 있습니다.</Alert>}
     {state.status === 'running' && <Box role="status"><LinearProgress sx={{ borderRadius: 2 }} /><Typography color="text.secondary" variant="body2" mt={1.5}>일봉과 부가 자료를 수집하고 추세·점수·신호를 계산하고 있습니다.</Typography></Box>}
     {state.status === 'error' && <Alert severity="error" action={<Button color="inherit" onClick={execute}>다시 실행</Button>}>{state.message}</Alert>}
     {state.status === 'success' && <>
       <UnifiedAnalysisResults data={state.data} saved={Boolean(state.snapshotId)} />
-      {state.snapshotId && <TradeDecisionPanel key={state.snapshotId} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} />}
+      {state.snapshotId && <NewsInsightsPanel key={state.snapshotId} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} />}
     </>}
     {state.status === 'idle' && <SectionCard><Stack alignItems="center" textAlign="center" sx={{ py: { xs: 4, md: 7 } }} gap={1.5}>
       <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(139,218,99,.08)', color: 'primary.main' }}><AutoAwesomeRoundedIcon sx={{ fontSize: 32 }} /></Box>

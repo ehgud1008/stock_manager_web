@@ -11,6 +11,9 @@ export const resumeUnifiedRun = id => httpClient.post(`${runsPath}/${id}/resume`
 export const recoverUnifiedRun = id => httpClient.post(`${runsPath}/${id}/recover`).then(unwrap);
 export const getUnifiedItems = (id, params, signal) => httpClient.get(`${runsPath}/${id}/items`, { params, signal }).then(unwrap);
 export const getUnifiedDetail = (id, code, signal) => httpClient.get(`${runsPath}/${id}/items/${code}`, { signal }).then(unwrap);
+export const getDailyReport = (id, signal) => httpClient.get(`${runsPath}/${id}/report`, { signal }).then(unwrap);
+export const requestDailyReport = id => httpClient.post(`${runsPath}/${id}/report`).then(unwrap);
+export const getCandidateEvidence = (id, code, signal) => httpClient.get(`${runsPath}/${id}/report/stocks/${code}`, { signal }).then(unwrap);
 
 // This page always calls the unified engine; single-stock mock settings do not apply.
 export async function analyzeUnifiedStock(stockCode, signal) {

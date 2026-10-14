@@ -73,14 +73,13 @@ describe('시장 전체 종합분석', () => {
     fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
     await screen.findByRole('heading', { name: '추세 구조' });
     expect(decisions.getDecisionCapabilities).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('tab', { name: 'AI 판단' }));
-    expect(await screen.findByRole('button', { name: 'AI 상세 검토' })).toBeEnabled();
-    expect(screen.getByRole('tabpanel', { name: 'AI 판단' })).toBeVisible();
-    fireEvent.mouseDown(screen.getByLabelText('보유기간 결정'));fireEvent.click(screen.getByRole('option', { name: '기간 직접 지정' }));
-    fireEvent.change(screen.getByLabelText('매수 후 예상 보유기간 (거래일)'), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('tab', { name: '뉴스·업황' }));
+    expect(await screen.findByRole('button', { name: '뉴스·업황 분석' })).toBeEnabled();
+    expect(screen.getByRole('tabpanel', { name: '뉴스·업황' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('관련 업종 검색어 (선택)'), { target: { value: '반도체' } });
     fireEvent.click(screen.getByRole('tab', { name: '스테이징' }));
-    fireEvent.click(screen.getByRole('tab', { name: 'AI 판단' }));
-    expect(screen.getByLabelText('매수 후 예상 보유기간 (거래일)')).toHaveValue(20);
+    fireEvent.click(screen.getByRole('tab', { name: '뉴스·업황' }));
+    expect(screen.getByLabelText('관련 업종 검색어 (선택)')).toHaveValue('반도체');
     expect(decisions.findImportedSnapshot).toHaveBeenCalledTimes(1);
     expect(decisions.startSnapshot).not.toHaveBeenCalled();expect(decisions.startDecision).not.toHaveBeenCalled();
     expect(screen.queryByRole('link', { name: '이 저장 결과로 AI 검토' })).not.toBeInTheDocument();
@@ -172,6 +171,36 @@ describe('시장 전체 종합분석', () => {
     api.listUnifiedRuns.mockRejectedValue(new Error('저장소 연결 실패'));
     setup(); expect(await screen.findByText('저장소 연결 실패')).toBeInTheDocument();
     expect(screen.getByText(/결과를 조회하지 못했습니다/)).toBeInTheDocument();
+  });
+  it.each(['WAITING_DATA', 'RETRY_WAIT', 'INTERRUPTED'])('EOD %s 상태에서도 조회를 갱신하며 거래일을 유지한다', async status => {
+    const eod = { priceBasis: 'KIWOOM_KRX_DAILY_ADJUSTED', priceCutoffEpoch: Date.parse('2026-09-18T11:00:00Z'),
+      eligibleEpoch: Date.parse('2026-09-18T11:10:00Z'), deadlineEpoch: Date.parse('2026-09-19T03:10:00Z'),
+      pending: 1, retrying: 1, dataUnavailable: 0, recoveryCount: 1 };
+    const waiting = { ...run, status, completed: 0, eod };
+    api.listUnifiedRuns.mockResolvedValue([waiting]);
+    api.getUnifiedItems.mockResolvedValueOnce({ ...page, run: waiting })
+      .mockResolvedValue({ ...page, run: { ...run, eod } });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let view;
+    try {
+      await act(async () => { view = setup(); });
+      expect(screen.getByRole('button', { name: '전체 종합분석 실행' })).toBeDisabled();
+      expect(screen.getByText(/미처리 1 · 확인·재시도 대기 1/)).toBeInTheDocument();
+      expect(screen.getByText(/완료 종목을 보존하며 이어서/)).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(api.getUnifiedItems).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(/선택한 결과는 2026-09-18 거래일/)).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(api.getUnifiedItems).toHaveBeenCalledTimes(2);
+    } finally { view?.unmount(); vi.useRealTimers(); }
+  });
+  it('저장된 당일 분석의 실제 수집 시점과 확인 한계를 보여준다', async () => {
+    api.getUnifiedDetail.mockResolvedValue({ ...unifiedAnalysisFixture(), eod: { tradeDate: '2026-09-18',
+      priceCutoffAt: '2026-09-18T11:00:00Z', collectedAt: '2026-09-18T15:01:00Z' } });
+    setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
+    expect(await screen.findByText(/제공사 확정 플래그가 없어 이후 정정될 수 있습니다/)).toHaveTextContent('실제 수집');
+    expect(api.analyzeUnifiedStock).not.toHaveBeenCalled();
   });
   it('선택 실행이 바뀌면 이전 요청을 취소하고 늦은 결과를 무시한다', async () => {
     const other = { ...run, runId: 'unified-2', baseDate: '2026-09-17' };

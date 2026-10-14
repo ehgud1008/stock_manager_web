@@ -93,7 +93,7 @@ describe('UnifiedAnalysisPage', () => {
     decisionApi.startSnapshot.mockResolvedValue({ id: 'saved-one', status: 'SUCCEEDED', result: { analysis: unifiedAnalysisFixture() } });
     render(<UnifiedAnalysisPage />);await choose('삼성전자');
     fireEvent.click(screen.getByRole('button', { name: '종합분석 실행' }));
-    expect(await screen.findByText('AI 매매 판단')).toBeInTheDocument();
+    expect(await screen.findByText('뉴스·업황 인사이트')).toBeInTheDocument();
     expect(analyzeUnifiedStock).not.toHaveBeenCalled();expect(window.location.search).toContain('snapshot=saved-one');
   });
   it('저장 주소를 열면 재분석 없이 스냅샷을 복원한다', async () => {
@@ -107,7 +107,7 @@ describe('UnifiedAnalysisPage', () => {
     getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: false });
     window.history.replaceState({}, '', '?sourceRun=run-one&stock=005930');
     decisionApi.startSnapshot.mockResolvedValue({ id: 'imported-one', stockCode: '005930', status: 'SUCCEEDED', result: { analysis: unifiedAnalysisFixture() } });
-    render(<UnifiedAnalysisPage />);expect(await screen.findByText('AI 매매 판단')).toBeInTheDocument();
+    render(<UnifiedAnalysisPage />);expect(await screen.findByText('뉴스·업황 인사이트')).toBeInTheDocument();
     expect(decisionApi.startSnapshot).toHaveBeenCalledWith('005930', expect.any(String), expect.any(AbortSignal), { source: 'UNIFIED_RUN_ITEM', runId: 'run-one' });
     expect(analyzeUnifiedStock).not.toHaveBeenCalled();
   });

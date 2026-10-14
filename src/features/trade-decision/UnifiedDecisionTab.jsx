@@ -1,7 +1,7 @@
 import { Alert, Button, LinearProgress, Stack, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import * as api from '../../api/tradeDecisionApi';
-import TradeDecisionPanel from './TradeDecisionPanel';
+import NewsInsightsPanel from './NewsInsightsPanel';
 
 export default function UnifiedDecisionTab({ runId, stockCode, priceDate }) {
   const [state, setState] = useState({ loading: true });
@@ -35,11 +35,11 @@ export default function UnifiedDecisionTab({ runId, stockCode, priceDate }) {
     return job;
   };
   return <Stack gap={2}>
-    <Typography variant="body2" color="text.secondary">현재 팝업의 저장 분석 · 가격일 {priceDate} 기준으로 검토합니다. 탭을 열어도 AI를 호출하거나 가격을 다시 수집하지 않습니다.</Typography>
+    <Typography variant="body2" color="text.secondary">저장된 엔진 분석의 가격일은 {priceDate}입니다. 뉴스·업황은 요청 시점의 자료를 보강하며, 탭을 열기만 하면 기존 이력을 조회합니다.</Typography>
     {state.loading && <LinearProgress aria-label="AI 판단 조회 중" />}
     {state.error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(n => n + 1)}>다시 조회</Button>}>{state.error}</Alert>}
-    {state.capabilities && !state.capabilities.enabled && <Alert severity="info">AI 매매 판단은 서버의 저장 분석 기능을 활성화한 후 사용할 수 있습니다.</Alert>}
-    {state.capabilities?.enabled && <TradeDecisionPanel embedded stockCode={stockCode} sourceRunId={runId}
+    {state.capabilities && !state.capabilities.enabled && <Alert severity="info">뉴스·업황 인사이트는 서버의 저장 분석 기능을 활성화한 후 사용할 수 있습니다.</Alert>}
+    {state.capabilities?.enabled && <NewsInsightsPanel key={`${runId}:${stockCode}`} embedded stockCode={stockCode}
       snapshotId={state.snapshot?.status === 'SUCCEEDED' ? state.snapshot.id : null}
       prepareSnapshot={prepare} aiConfigured={state.capabilities.aiConfigured} />}
   </Stack>;

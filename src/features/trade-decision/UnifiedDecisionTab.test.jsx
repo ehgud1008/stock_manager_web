@@ -5,7 +5,7 @@ import UnifiedDecisionTab from './UnifiedDecisionTab';
 
 vi.mock('../../api/tradeDecisionApi', async original => ({ ...await original(), previewDecisionPlan: vi.fn().mockResolvedValue(null), previewSourcePlan: vi.fn().mockResolvedValue(null),
   getDecisionCapabilities: vi.fn(), findImportedSnapshot: vi.fn(), startSnapshot: vi.fn(), getSnapshot: vi.fn(),
-  listDecisions: vi.fn(), getDecision: vi.fn(), startDecision: vi.fn(), waitForJob: vi.fn(),
+  listDecisions: vi.fn(), getDecision: vi.fn(), startNewsInsights: vi.fn(), waitForJob: vi.fn(),
 }));
 const snapshot = { id: 'snapshot-a', status: 'SUCCEEDED', stockCode: '005930' };
 const decision = { id: 'decision-a', snapshotId: 'snapshot-a', status: 'SUCCEEDED', context: { positionStatus: 'NOT_HELD', horizonTradingDays: 10 },
@@ -16,19 +16,19 @@ describe('UnifiedDecisionTab', () => {
     vi.clearAllMocks(); sessionStorage.clear();window.history.replaceState({}, '', '/unified-analysis');
     api.getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: true });
     api.findImportedSnapshot.mockResolvedValue(null);api.listDecisions.mockResolvedValue({ items: [], hasMore: false });
-    api.startSnapshot.mockResolvedValue(snapshot);api.startDecision.mockResolvedValue(decision);
+    api.startSnapshot.mockResolvedValue(snapshot);api.startNewsInsights.mockResolvedValue(decision);
     api.waitForJob.mockImplementation(async j => j);
   });
   it('탭 진입은 선택 실행을 조회하며 작업을 생성하지 않는다', async () => {
-    setup();expect(await screen.findByRole('button', { name: 'AI 상세 검토' })).toBeEnabled();
+    setup();expect(await screen.findByRole('button', { name: '뉴스·업황 분석' })).toBeEnabled();
     expect(api.findImportedSnapshot).toHaveBeenCalledWith('005930', 'run-a', expect.any(AbortSignal));
-    expect(api.startSnapshot).not.toHaveBeenCalled();expect(api.startDecision).not.toHaveBeenCalled();
+    expect(api.startSnapshot).not.toHaveBeenCalled();expect(api.startNewsInsights).not.toHaveBeenCalled();
   });
   it('버튼을 누를 때만 선택 실행을 복사하고 팝업 안에서 판단을 보여준다', async () => {
-    setup();fireEvent.click(await screen.findByRole('button', { name: 'AI 상세 검토' }));
-    expect(await screen.findByText('신규 진입 대기')).toBeInTheDocument();
+    setup();fireEvent.click(await screen.findByRole('button', { name: '뉴스·업황 분석' }));
+    expect(await screen.findByText('이전 AI 매매 판단 결과')).toBeInTheDocument();
     expect(api.startSnapshot).toHaveBeenCalledWith('005930', expect.any(String), expect.any(AbortSignal), { source: 'UNIFIED_RUN_ITEM', runId: 'run-a' });
-    expect(api.startDecision).toHaveBeenCalledWith('snapshot-a', expect.any(Object), expect.any(String), expect.any(AbortSignal));
+    expect(api.startNewsInsights).toHaveBeenCalledWith('snapshot-a', expect.any(Object), expect.any(String), expect.any(AbortSignal));
     expect(window.location.pathname).toBe('/unified-analysis');expect(window.location.search).toBe('');
     await waitFor(() => expect(api.listDecisions).toHaveBeenCalledWith('005930', expect.any(AbortSignal), 0, 'snapshot-a'));
   });
@@ -36,9 +36,9 @@ describe('UnifiedDecisionTab', () => {
     api.findImportedSnapshot.mockResolvedValue(snapshot);
     api.listDecisions.mockResolvedValue({ items: [{ id: 'decision-a', snapshotId: 'snapshot-a', createdAt: 1, action: 'WAIT' }], hasMore: false });
     api.getDecision.mockResolvedValue(decision);
-    setup();expect(await screen.findByText('신규 진입 대기')).toBeInTheDocument();
+    setup();expect(await screen.findByText('이전 AI 매매 판단 결과')).toBeInTheDocument();
     expect(api.getDecision).toHaveBeenCalledWith('decision-a', expect.any(AbortSignal));
-    expect(api.startSnapshot).not.toHaveBeenCalled();expect(api.startDecision).not.toHaveBeenCalled();
+    expect(api.startSnapshot).not.toHaveBeenCalled();expect(api.startNewsInsights).not.toHaveBeenCalled();
     expect(screen.queryByRole('link', { name: '해당 분석 열기' })).not.toBeInTheDocument();
   });
   it('미설정 상태와 조회 오류를 구분하고 실패 시 자동 생성하지 않는다', async () => {
@@ -46,7 +46,7 @@ describe('UnifiedDecisionTab', () => {
     setup();expect(await screen.findByText('조회 실패')).toBeInTheDocument();
     expect(api.startSnapshot).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '다시 조회' }));
-    expect(await screen.findByRole('button', { name: 'AI 상세 검토' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: '뉴스·업황 분석' })).toBeEnabled();
   });
   it('기능 비활성화이면 저장 테이블을 조회하지 않는다', async () => {
     api.getDecisionCapabilities.mockResolvedValue({ enabled: false, aiConfigured: false });
@@ -57,8 +57,8 @@ describe('UnifiedDecisionTab', () => {
     const pending = { ...snapshot, status: 'RUNNING' };
     api.findImportedSnapshot.mockResolvedValue(pending);
     api.waitForJob.mockImplementation(async j => j.id === 'snapshot-a' ? snapshot : j);
-    setup();fireEvent.click(await screen.findByRole('button', { name: 'AI 상세 검토' }));
-    expect(await screen.findByText('신규 진입 대기')).toBeInTheDocument();
-    expect(api.startSnapshot).not.toHaveBeenCalled();expect(api.startDecision).toHaveBeenCalledTimes(1);
+    setup();fireEvent.click(await screen.findByRole('button', { name: '뉴스·업황 분석' }));
+    expect(await screen.findByText('이전 AI 매매 판단 결과')).toBeInTheDocument();
+    expect(api.startSnapshot).not.toHaveBeenCalled();expect(api.startNewsInsights).toHaveBeenCalledTimes(1);
   });
 });

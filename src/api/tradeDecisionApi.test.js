@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import httpClient from './httpClient';
-import { getSnapshot, isJobPending, pause, requestIdentity, startDecision, waitForJob } from './tradeDecisionApi';
+import { getSnapshot, isJobPending, pause, requestIdentity, startDecision, startNewsInsights, waitForJob } from './tradeDecisionApi';
 vi.mock('./httpClient', () => ({ default: { post: vi.fn(), get: vi.fn() } }));
 
 describe('tradeDecisionApi', () => {
@@ -15,6 +15,12 @@ describe('tradeDecisionApi', () => {
   it('실패 응답을 완료 데이터로 사용하지 않는다', async () => {
     httpClient.get.mockResolvedValue({ data: { success: false, message: '분석 없음' } });
     await expect(getSnapshot('missing')).rejects.toThrow('분석 없음');
+  });
+  it('뉴스 수집 요청을 새 경로로 보내고 기존 상태 조회 형식을 유지한다', async () => {
+    httpClient.post.mockResolvedValue({ data: { success: true, data: { id: 'news-one' } } });
+    const body = { lookbackDays: 14, sectorQuery: '반도체' };
+    expect(await startNewsInsights('snapshot', body, 'news-key')).toEqual({ id: 'news-one' });
+    expect(httpClient.post).toHaveBeenCalledWith('/v1/analysis-snapshots/snapshot/news-insights', body, expect.objectContaining({ headers: { 'Idempotency-Key': 'news-key' } }));
   });
   it('동일 입력의 네트워크 재시도에는 같은 키를 재사용한다', () => {
     const first = requestIdentity('key', { horizon: 10 });

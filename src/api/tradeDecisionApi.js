@@ -12,6 +12,7 @@ export const previewDecisionPlan = (id, body, signal) => httpClient.post(`/v1/an
 export const previewSourcePlan = (code, sourceRunId, body, signal) => httpClient.post(`/v1/stocks/${code}/decision-plan`, body, { signal, params: { sourceRunId } }).then(unwrap);
 export const findImportedSnapshot = (code, sourceRunId, signal) => httpClient.get(`/v1/stocks/${code}/analysis-snapshots`, { signal, params: { sourceRunId } }).then(unwrap);
 export const startDecision = (id, body, key, signal) => post(`analysis-snapshots/${id}/decisions`, body, key, signal);
+export const startNewsInsights = (id, body, key, signal) => post(`analysis-snapshots/${id}/news-insights`, body, key, signal);
 export const getDecision = (id, signal) => httpClient.get(`/v1/trade-decisions/${id}`, { signal }).then(unwrap);
 export const reviseDecision = (id, key, signal) => post(`trade-decisions/${id}/revisions`, {}, key, signal);
 export const retryDecision = (id, key, signal) => post(`trade-decisions/${id}/retry`, {}, key, signal);
