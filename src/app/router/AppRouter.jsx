@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import AppLayout from '../../components/layout/AppLayout';
 import StockAnalysisPage from '../../pages/analysis/StockAnalysisPage';
 import AnalysisScanPage from '../../pages/analysis/AnalysisScanPage';
+import DailyReportsPage from '../../pages/analysis/DailyReportsPage';
 import UnifiedAnalysisPage from '../../pages/analysis/UnifiedAnalysisPage';
 import UnifiedSingleAnalysisPage from '../../pages/analysis/UnifiedSingleAnalysisPage';
 import BacktestPage from '../../pages/backtest/BacktestPage';
@@ -17,6 +18,7 @@ export default function AppRouter() {
       <Route element={<AppLayout />}>
         <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
         <Route path={ROUTES.ANALYSIS} element={<StockAnalysisPage />} />
+        <Route path={ROUTES.DAILY_REPORTS} element={<DailyReportsPage />} />
         <Route path={ROUTES.UNIFIED_ANALYSIS} element={<UnifiedAnalysisPage />} />
         <Route path={`${ROUTES.UNIFIED_ANALYSIS}/stock`} element={<UnifiedSingleAnalysisPage />} />
         <Route path="/analysis-scans" element={<AnalysisScanPage />} />

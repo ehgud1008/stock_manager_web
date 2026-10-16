@@ -1,4 +1,5 @@
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
@@ -13,6 +14,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 const drawerWidth = 248;
 const navigation = [
   { label: '대시보드', path: '/', icon: <DashboardOutlinedIcon /> },
+  { label: '장 마감 리포트', path: '/daily-reports', icon: <SummarizeOutlinedIcon /> },
   { label: '종합분석', path: '/unified-analysis', icon: <AutoAwesomeOutlinedIcon /> },
   { label: '종목 분석', path: '/analysis/005930', icon: <AssessmentOutlinedIcon /> },
   { label: '전체 종목분석', path: '/analysis-scans', icon: <AssessmentOutlinedIcon /> },
@@ -23,7 +25,7 @@ const navigation = [
 
 function NavigationContent({ onNavigate }) {
   const location = useLocation();
-  const screener = ['/screener', '/analysis-scans', '/unified-analysis'].some(path => location.pathname.startsWith(path));
+  const screener = ['/screener', '/analysis-scans', '/unified-analysis', '/daily-reports'].some(path => location.pathname.startsWith(path));
   return (
     <Stack height="100%">
       <Stack direction="row" alignItems="center" gap={1.25} px={2.5} py={2.8}>
@@ -66,7 +68,7 @@ export default function AppLayout() {
           {!desktop && <IconButton edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 1 }} aria-label="메뉴 열기"><MenuRoundedIcon /></IconButton>}
           <Typography variant="body2" color="text.secondary">KOREA EQUITY / RESEARCH</Typography>
           <Box flex={1} />
-          <Chip label={['/screener', '/analysis-scans', '/unified-analysis'].some(path => location.pathname.startsWith(path)) ? 'ENGINE API' : 'MOCK DATA'} size="small" variant="outlined" sx={{ fontSize: 10, letterSpacing: '.08em' }} />
+          <Chip label={['/screener', '/analysis-scans', '/unified-analysis', '/daily-reports'].some(path => location.pathname.startsWith(path)) ? 'ENGINE API' : 'MOCK DATA'} size="small" variant="outlined" sx={{ fontSize: 10, letterSpacing: '.08em' }} />
         </Toolbar>
       </AppBar>
       <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>

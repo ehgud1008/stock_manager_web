@@ -4,15 +4,17 @@ import { useEffect, useRef, useState } from 'react';
 import SectionCard from '../../components/common/SectionCard';
 import * as api from '../../api/unifiedAnalysisApi';
 
-const STATES = { NOT_CREATED: '보고서 미생성', PENDING: '보고서 대기', WORKING: '보고서 작성 중', WAITING_SCAN: '전체 분석 완료 대기', RETRY_WAIT: '자료 확인 재시도', READY: '보고서 완료', FAILED: '보고서 실패' };
+
+const STATES = { DISABLED: '보고서 기능 비활성화', NOT_CREATED: '보고서 미생성', PENDING: '보고서 대기', WORKING: '보고서 작성 중', WAITING_SCAN: '전체 분석 완료 대기', RETRY_WAIT: '자료 확인 재시도', READY: '보고서 완료', FAILED: '보고서 실패' };
 const DELIVERY = { DISABLED: '알림 비활성화', PENDING: '발송 대기', SENDING: '발송 중', SENT: '발송 완료', RETRY_WAIT: '발송 재시도 대기', UNKNOWN: '전송 여부 확인 필요 · 자동 재전송 중지', FAILED: '발송 실패', EXPIRED: '발송 기한 만료' };
 const ROLES = { SELECTION: '선정 조건', SUPPORT: '보강 근거', GATE: '제외 조건 확인', RISK: '위험 참고' };
 const format = value => value == null ? '미확인' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
 const time = value => value ? new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false }) : '—';
-export default function DailyReportPanel({ runId, onDetail }) {
+export default function DailyReportPanel({ runId, onDetail, onLoaded }) {
   const [state, setState] = useState({ loading: true });
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
+
   const alive = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
@@ -22,13 +24,13 @@ export default function DailyReportPanel({ runId, onDetail }) {
       try {
         const data = await api.getDailyReport(runId, controller.signal);
         if (controller.signal.aborted) return;
-        setState({ data });
+        setState({ data }); onLoaded?.(runId, data);
         if (['PENDING', 'WORKING', 'WAITING_SCAN', 'RETRY_WAIT', 'NOT_CREATED'].includes(data?.state)
           || ['PENDING', 'SENDING', 'RETRY_WAIT'].includes(data?.notificationState)) timer = setTimeout(load, 5000);
       } catch (e) { if (!controller.signal.aborted) setState({ error: e.message }); }
     };
     load(); return () => { controller.abort(); clearTimeout(timer); };
-  }, [runId, refresh]);
+  }, [runId, refresh, onLoaded]);
   const request = async () => {
     if (busy) return;
     setBusy(true);
@@ -77,6 +79,7 @@ export default function DailyReportPanel({ runId, onDetail }) {
           <Typography variant="body2">유효 분석 {report.assessedStocks} / 대상 {report.eligibleStocks}종목 · {report.version}</Typography>
           {report.limitations.map((text, i) => <Typography variant="body2" key={i}>{text}</Typography>)}
         </Stack></AccordionDetails></Accordion>
+
       </>}
     </Stack>
   </SectionCard>;

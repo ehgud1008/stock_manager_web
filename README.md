@@ -97,3 +97,7 @@ npm run test
 npm run lint
 npm run build
 ```
+
+## 장 마감 리포트 메뉴
+
+`/daily-reports`에서 최신 확정 전체 시장 보고서를 기본 표시합니다. 시장·선정 종목, 성과 검증, 운영 상태 탭으로 나뉘며 날짜·실행을 선택할 수 있습니다. `/daily-reports?runId=실행ID`는 지정 보고서를 유지합니다. 보고서 목록은 `GET /api/v1/unified-analysis/reports`를 사용하므로 해당 API를 포함한 백엔드와 함께 반영하세요. 기존 종합분석은 종목 탐색·검색과 공통 상세를 유지합니다. 메뉴 이동 자체로 분석·발송을 실행하지 않습니다.

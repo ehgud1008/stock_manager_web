@@ -216,4 +216,14 @@ describe('시장 전체 종합분석', () => {
     await act(async () => finish(page));
     expect(screen.queryByText('삼성전자')).not.toBeInTheDocument();
   });
+
+  it('기존 실행 링크에서 동일 보고서의 새 메뉴로 연결한다', async () => {
+    const id = '12345678-1234-1234-1234-123456789abc';
+    const savedRun = { ...run, runId: id, eod: { tradeDate: run.baseDate } };
+    api.listUnifiedRuns.mockResolvedValue([savedRun]); api.getUnifiedItems.mockResolvedValue({ ...page, run: savedRun });
+    render(<MemoryRouter initialEntries={['/unified-analysis?runId=' + id]}><UnifiedAnalysisPage /></MemoryRouter>);
+    await screen.findByText('삼성전자');
+    expect(screen.getByRole('link', { name: '장 마감 리포트 열기' })).toHaveAttribute('href', '/daily-reports?runId=' + id);
+    expect(api.getDailyReport).not.toHaveBeenCalled(); expect(api.requestDailyReport).not.toHaveBeenCalled();
+  });
 });

@@ -9,6 +9,14 @@ const report = { status: 'READY', tradeDate: '2026-10-13', forecastDate: '2026-1
   candidates: [], limitations: ['업종과 공시는 미확인'], assessedStocks: 100, eligibleStocks: 110, version: 'candidate-market-v1' };
 describe('장 마감 보고서', () => {
   beforeEach(() => { vi.resetAllMocks(); api.getDailyReport.mockResolvedValue({ state: 'READY', report, notificationState: 'DISABLED' }); });
+  it('비활성화 상태에서는 생성 버튼과 후보 없음 판정을 표시하지 않는다', async () => {
+    api.getDailyReport.mockResolvedValue({ state: 'DISABLED', notificationState: 'DISABLED' });
+    render(<DailyReportPanel runId="r1" onDetail={vi.fn()} />);
+    expect(await screen.findByText('보고서 기능 비활성화')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '이 실행의 보고서 생성' })).not.toBeInTheDocument();
+    expect(screen.queryByText('오늘은 조건을 충족한 종목이 없습니다')).not.toBeInTheDocument();
+    expect(api.requestDailyReport).not.toHaveBeenCalled();
+  });
   it('보고서를 조회만 하며 후보 없음과 실패를 구분한다', async () => {
     const view = render(<DailyReportPanel runId="r1" onDetail={vi.fn()} />);
     expect(await screen.findByText('오늘은 조건을 충족한 종목이 없습니다')).toBeInTheDocument();
