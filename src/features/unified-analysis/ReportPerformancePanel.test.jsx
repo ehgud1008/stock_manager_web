@@ -26,6 +26,22 @@ describe('선정 이후 성과 검증', () => {
     expect(screen.getByRole('table', { name: '후보 사후 성과' })).toHaveTextContent('가격 기준 변경');
     expect(screen.getByText(/평가 대기·미확인/)).toBeInTheDocument();expect(api.requestReportPerformance).not.toHaveBeenCalled();
   });
+  it('새 평가의 다섯 기간과 시장 초과수익·경로 미확인을 구분한다', async () => {
+    const updated = { ...result, reportVersion: 'candidate-market-v2/test', policy: { ...result.policy, version: 'forward-evaluation-v2' },
+      stocks: [{ ...result.stocks[0], disposition: 'WATCH', strategy: 'BREAKOUT', horizons: [
+        { days: 1, state: 'VALID', priceReturnPercent: 2, marketState: 'VALID', marketReturnPercent: 1, excessReturnPercent: 1, pathState: 'VALID', maximumRisePercent: 5, maximumFallPercent: -3 },
+        { days: 3, state: 'VALID', priceReturnPercent: 4, marketState: 'MISSING', pathState: 'MISSING' },
+        ...[5, 10, 20].map(days => ({ days, state: 'PENDING', marketState: 'PENDING', pathState: 'PENDING' }))
+      ] }] };
+    api.getReportPerformance.mockResolvedValue({ state: 'WAITING_DATA', revision: 1, result: updated });
+    render(<ReportPerformancePanel runId="new" />);
+    const table = await screen.findByRole('table', { name: '후보 사후 성과' });
+    for (const days of [1, 3, 5, 10, 20]) expect(screen.getByRole('columnheader', { name: days + '거래일 성과' })).toBeInTheDocument();
+    expect(table).toHaveTextContent('초과 1%p');expect(table).toHaveTextContent('최대 상승 5%');
+    expect(table).toHaveTextContent('최대 하락 -3%');expect(table).toHaveTextContent('시장 자료 대기');
+    expect(table).toHaveTextContent('최대 상승 자료 대기');expect(table).toHaveTextContent('기간 미도래');
+    expect(screen.getByText(/선정 기준 candidate-market-v2/)).toBeInTheDocument();
+  });
   it('화면 조회와 명시적인 평가 등록을 구분한다', async () => {
     api.getReportPerformance.mockResolvedValue({ state: 'NOT_CREATED' });api.requestReportPerformance.mockResolvedValue({ state: 'PENDING' });
     render(<ReportPerformancePanel runId="one" />);

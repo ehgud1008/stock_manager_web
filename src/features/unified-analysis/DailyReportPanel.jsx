@@ -58,6 +58,8 @@ export default function DailyReportPanel({ runId, onDetail, onLoaded }) {
           <Typography variant="body2">하방: {market.downsideScenario}</Typography>
           {market.cautions.map((warning, i) => <Typography variant="caption" color="text.secondary" key={i}>{warning}</Typography>)}
         </Stack>)}
+        <Typography variant="subtitle1">조건부 진입 {report.candidates.filter(stock => stock.disposition === 'ENTRY_CONDITIONAL').length}종목 · 관찰 {report.candidates.filter(stock => stock.disposition === 'WATCH').length}종목</Typography>
+        {!!report.candidates.length && !report.candidates.some(stock => stock.disposition === 'ENTRY_CONDITIONAL') && <Alert severity="warning">오늘은 진입 조건을 충족한 종목이 없습니다. 아래는 관찰 대상입니다.</Alert>}
         {!report.candidates.length && <Alert severity="info">오늘은 조건을 충족한 종목이 없습니다</Alert>}
         {report.candidates.map(stock => <Accordion key={stock.code} disableGutters>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}><Stack gap={0.5}><Typography fontWeight={650}>{stock.name} ({stock.code}) · {stock.disposition === 'WATCH' ? '관찰 대상' : '조건부 진입 검토'}</Typography>

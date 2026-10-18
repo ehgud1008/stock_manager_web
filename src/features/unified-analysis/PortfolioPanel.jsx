@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, LinearProgress, MenuItem, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import * as api from '../../api/portfolioApi';
+import TelegramConnectionPanel from './TelegramConnectionPanel';
 
 const number = (v, digits = 2) => v == null ? '미확인' : Number(v).toLocaleString('ko-KR', { maximumFractionDigits: digits });
 const percent = v => v == null ? '미확인' : `${number(v)}%`;
@@ -138,6 +139,7 @@ export function OperationsWorkspace({ reportId }) {
     <Button disabled={busy} onClick={() => { setError(''); setRefresh(n => n + 1); }}>운영 상태 새로고침</Button>
     {error && <Alert severity="error">{error}</Alert>}{!status && !error && <LinearProgress aria-label="운영 상태 조회 중" />}
     {status && !status.enabled && <Alert severity="info">운영 확인 기능 비활성화</Alert>}
+    {status && <TelegramConnectionPanel enabled={status.enabled} />}
     {status?.enabled && <>
       <Stack direction="row" flexWrap="wrap" gap={1}>{Object.entries(status.features).map(([key, enabled]) => <Chip key={key} variant="outlined" label={`${({ schedule: '예약', eodWorker: '마감 수집', report: '보고서', telegram: '텔레그램', performance: '개별 성과', portfolio: '누적 성과' }[key]) || key} ${enabled ? '켜짐' : '꺼짐'}`} />)}</Stack>
       <Typography variant="body2">최근 예정 거래일 {status.expectedTradeDate || '확인 불가'} · 전체 시장 실행 {status.expectedScanPresent ? '있음' : '미확인'}<br />달력 확인 범위 {status.calendarThrough || '확인 불가'} · {status.calendarVersion}<br />텔레그램 대상 {status.destinationLabel} · 인증 설정 {status.credentialsConfigured ? '있음' : '없음'}</Typography>

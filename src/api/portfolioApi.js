@@ -12,3 +12,5 @@ export const getRevision = (id, revision, signal) => httpClient.get(`${base}/por
 export const getOperations = signal => httpClient.get(`${base}/operations`, { signal }).then(unwrap);
 export const previewReport = (id, signal) => httpClient.get(`${base}/operations/reports/${encodeURIComponent(id)}/preview`, { signal }).then(unwrap);
 export const sendTelegramTest = (request, key) => httpClient.post(`${base}/operations/telegram-tests`, request, { headers: { 'Idempotency-Key': key } }).then(unwrap);
+
+export const checkTelegramConnection = signal => httpClient.post(`${base}/operations/telegram-connection`, {}, { signal, timeout: 25000 }).then(unwrap);
