@@ -24,6 +24,18 @@ describe('시장 전체 종합분석', () => {
     decisions.getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: true });
     decisions.findImportedSnapshot.mockResolvedValue(null);
   });
+  it('시가 조건 제외 사유를 상세 상단에 표시하고 가격 시나리오를 제공하지 않는다', async () => {
+    const detail = unifiedAnalysisFixture();
+    detail.result.analysis.strategy = { strategyCode: 'OPEN_PRICE_EXCLUDED', strategyName: '시가 기준 매매 제외', action: 'AVOID', reasons: ['시가 기준 제외'] };
+    detail.result.analysis.scenario = null;
+    api.getUnifiedDetail.mockResolvedValue(detail);
+    setup();
+    await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
+    expect(await screen.findByText(/시장 통계와 매도·익절 신호는 유지합니다/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '차트', exact: true }));
+    expect(StockChartPanel).toHaveBeenCalledWith(expect.objectContaining({ analysis: undefined }), undefined);
+  });
   it('저장 결과를 조회하고 상세에서도 재분석하지 않는다', async () => {
     setup(); expect(await screen.findByText('삼성전자')).toBeInTheDocument();
     expect(screen.getByText('S6 · 상승 전환')).toBeInTheDocument();

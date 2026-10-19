@@ -4,6 +4,7 @@ import { Alert, Box, Button, LinearProgress, MenuItem, Stack, Tab, Tabs, TextFie
 import * as api from '../../api/unifiedAnalysisApi';
 import DailyReportPanel from '../../features/unified-analysis/DailyReportPanel';
 import ReportPerformancePanel from '../../features/unified-analysis/ReportPerformancePanel';
+import ScenarioMonitoringPanel from '../../features/unified-analysis/ScenarioMonitoringPanel';
 import { PortfolioWorkspace, OperationsWorkspace } from '../../features/unified-analysis/PortfolioPanel';
 import SavedUnifiedDetail from '../../features/unified-analysis/SavedUnifiedDetail';
 import SectionCard from '../../components/common/SectionCard';
@@ -34,6 +35,12 @@ export default function DailyReportsPage() {
     load(); return () => { controller.abort(); clearTimeout(timer); };
   }, [page, refresh]);
   const id = invalidId ? '' : requested || library?.latestReady?.runId || library?.newestRun?.runId || '';
+  useEffect(() => {
+    if (tab !== 'performance' || requested || !id || !library?.enabled) return;
+    const next = new URLSearchParams(params);
+    next.set('runId', id);
+    setParams(next, { replace: true });
+  }, [tab, requested, id, library?.enabled, params, setParams]);
   const options = [...new Map([library?.latestReady, library?.newestRun, ...(library?.reports || [])].filter(Boolean).map(item => [item.runId, item])).values()];
   const selected = options.find(item => item.runId === id);
   const current = loaded?.runId === id ? loaded.data : null;
@@ -41,7 +48,7 @@ export default function DailyReportsPage() {
   const ready = current ? current.state === 'READY' : selected?.reportState === 'READY';
   const stale = date && library?.expectedTradeDate && date < library.expectedTradeDate;
   const choose = value => { const next = new URLSearchParams(params); if (value) next.set('runId', value); else next.delete('runId'); setParams(next); setSelection(null); };
-  const changeTab = value => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next); setSelection(null); };
+  const changeTab = value => { const next = new URLSearchParams(params); next.set('tab', value); if (value === 'performance' && id) next.set('runId', id); setParams(next); setSelection(null); };
   return <Stack gap={2.5}>
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2}>
       <Box><Typography variant="overline" color="primary.main">DAILY MARKET REPORT</Typography><Typography variant="h1">장 마감 리포트</Typography><Typography color="text.secondary" mt={1}>시장 흐름과 선정 근거를 확인하고, 이후 성과를 함께 검증하세요.</Typography></Box>
@@ -49,7 +56,7 @@ export default function DailyReportsPage() {
     </Stack>
     <Stack direction="row" gap={1} flexWrap="wrap">
       <Button onClick={() => { setRefresh(n => n + 1); }} disabled={loading}>보고서 새로고침</Button>
-      <Button onClick={() => { choose(''); setPage(0); }} disabled={!library?.latestReady}>최신 확정 보고서 보기</Button>
+      <Button onClick={() => { choose(library.latestReady.runId); setPage(0); }} disabled={!library?.latestReady}>최신 확정 보고서 보기</Button>
     </Stack>
     {loading && <LinearProgress aria-label="보고서 목록 조회 중" />}
     {error && <Alert severity="error">보고서 목록을 조회하지 못했습니다. {error}</Alert>}
@@ -76,6 +83,7 @@ export default function DailyReportsPage() {
     {tabOptions.map(([value]) => <Box key={value} role="tabpanel" id={`daily-${value}-panel`} aria-labelledby={`daily-${value}-tab`} hidden={tab !== value}>
       {tab === value && value === 'report' && (id && library?.enabled ? <DailyReportPanel key={`${id}:${refresh}`} runId={id} onLoaded={onLoaded} onDetail={stock => setSelection({ runId: id, code: stock.code, name: stock.name })} /> : <Alert severity="info">확인할 보고서를 선택하세요. 20시 자동 분석의 보고서가 준비되면 여기에서 확인할 수 있습니다.</Alert>)}
       {tab === value && value === 'performance' && <Stack gap={2.5}>
+        <SectionCard title="선정 종목 시나리오 추적">{id && library?.enabled ? <ScenarioMonitoringPanel key={id} runId={id} onDetail={stock => setSelection({ runId: id, code: stock.code, name: stock.name })} /> : <Typography>보고서를 선택하면 선정 당시 목표·손절과 이후 진행 상황을 확인할 수 있습니다.</Typography>}</SectionCard>
         <SectionCard title="선택 보고서의 선정 이후 성과">{id && library?.enabled ? <ReportPerformancePanel key={id} runId={id} /> : <Typography>보고서를 선택하면 해당 후보의 사후 성과를 볼 수 있습니다.</Typography>}</SectionCard>
         <SectionCard title="누적 모의계좌 · 전략 검증"><PortfolioWorkspace /></SectionCard>
       </Stack>}

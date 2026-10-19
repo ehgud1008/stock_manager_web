@@ -16,6 +16,7 @@ export const getDailyReport = (id, signal) => httpClient.get(`${runsPath}/${id}/
 export const requestDailyReport = id => httpClient.post(`${runsPath}/${id}/report`).then(unwrap);
 export const getCandidateEvidence = (id, code, signal) => httpClient.get(`${runsPath}/${id}/report/stocks/${code}`, { signal }).then(unwrap);
 export const getReportPerformance = (id, signal) => httpClient.get(`${runsPath}/${id}/performance`, { signal }).then(unwrap);
+export const getScenarioMonitoring = (id, signal) => httpClient.get(`${runsPath}/${id}/monitoring`, { signal }).then(unwrap);
 export const requestReportPerformance = id => httpClient.post(`${runsPath}/${id}/performance`).then(unwrap);
 
 // This page always calls the unified engine; single-stock mock settings do not apply.

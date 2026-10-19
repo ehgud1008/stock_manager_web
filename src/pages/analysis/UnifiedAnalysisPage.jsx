@@ -96,7 +96,7 @@ export default function UnifiedAnalysisPage() {
         <Typography color="text.secondary" mt={1}>시장 전체의 추세와 매매 조건을 함께 분석하고, 원하는 종목을 찾아보세요.</Typography></Box>
       <Button component={Link} to="/unified-analysis/stock" sx={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>개별 종합분석</Button>
     </Stack>
-    <SectionCard title="시장 전체 분석" caption="한국시간 20시 이후 분석 가능한 거래일의 국내 일반주식을 분석합니다. 마감 자료를 확인한 뒤 결과를 저장합니다.">
+    <SectionCard title="시장 전체 분석" caption="한국시간 20시 이후 분석 가능한 거래일의 국내 일반주식을 분석합니다. 마감 자료를 확인한 뒤 결과를 저장합니다. 새 분석부터 기준일 시가 2,000원 이하 종목은 매매 후보에서 제외하고 시장 통계에는 포함합니다.">
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField select size="small" label="분석 대상 시장" value={market} disabled={busy} onChange={e => setMarket(e.target.value)} sx={{ minWidth: 180 }}>
           <MenuItem value="ALL">코스피 + 코스닥</MenuItem><MenuItem value="KOSPI">코스피</MenuItem><MenuItem value="KOSDAQ">코스닥</MenuItem>

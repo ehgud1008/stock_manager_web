@@ -45,6 +45,9 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
   const qualityLimited = collectionQuality !== 'COMPLETE' || screener.quality !== 'VALID' || analysis.totalScore == null;
 
   return <Stack gap={2.5} aria-label="종합분석 결과">
+    {analysis.strategy.strategyCode === 'OPEN_PRICE_EXCLUDED' && <Alert severity="warning">
+      분석 기준일 시가가 2,000원 이하인 종목은 매매 후보에서 제외합니다. 시장 통계와 매도·익절 신호는 유지합니다.
+    </Alert>}
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
       <Box><Stack direction="row" gap={1} alignItems="center"><Typography variant="h2">{stock.stockName}</Typography><Chip size="small" variant="outlined" label={stock.marketCode} /></Stack>
         <Typography color="text.secondary" variant="body2" mt={0.75}>{stock.stockCode} · 가격일 {result.priceDate} · 분석 기준 {result.asOf.replace('T', ' ')} (한국시간)</Typography></Box>

@@ -44,6 +44,7 @@ export default function ReportPerformancePanel({ runId }) {
     {state.loading && <LinearProgress aria-label="사후 검증 조회 중" />}
     {state.error && <Alert severity="error">{state.error}</Alert>}
     {state.data && <Chip label={STATES[state.data.state] || state.data.state} sx={{ alignSelf: 'flex-start' }} />}
+    {state.data?.state === 'DISABLED' && <Alert severity="info">비용을 반영한 모의매매 성과 계산은 비활성화되어 있습니다. 선정 종목의 목표·손절 추적은 위 시나리오 추적에서 별도로 확인할 수 있습니다.</Alert>}
     {state.data?.state === 'NOT_CREATED' && <Button disabled={busy} onClick={request}>이 보고서의 사후 검증 등록</Button>}
     {state.data?.state !== 'DISABLED' && <Button onClick={() => setRefresh(n => n + 1)} sx={{ alignSelf: 'flex-start' }}>평가 새로고침</Button>}
     {['FAILED', 'DATA_INCOMPLETE'].includes(state.data?.state) && <Alert severity="warning">확인하지 못한 성과가 있습니다. 누락을 수익 0%나 정상 완료로 해석하지 마세요.</Alert>}
