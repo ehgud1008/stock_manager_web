@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Alert, Box, Button, LinearProgress, MenuItem, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, LinearProgress, MenuItem, Stack, Tab, Tabs, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import * as api from '../../api/unifiedAnalysisApi';
 import DailyReportPanel from '../../features/unified-analysis/DailyReportPanel';
 import ReportPerformancePanel from '../../features/unified-analysis/ReportPerformancePanel';
 import ScenarioMonitoringPanel from '../../features/unified-analysis/ScenarioMonitoringPanel';
+import ScenarioMonitoringOverviewPanel from '../../features/unified-analysis/ScenarioMonitoringOverviewPanel';
 import { PortfolioWorkspace, OperationsWorkspace } from '../../features/unified-analysis/PortfolioPanel';
 import SavedUnifiedDetail from '../../features/unified-analysis/SavedUnifiedDetail';
 import SectionCard from '../../components/common/SectionCard';
@@ -18,6 +19,7 @@ export default function DailyReportsPage() {
   const requested = params.get('runId') || '';
   const invalidId = requested && !/^[A-Za-z0-9-]{1,100}$/.test(requested);
   const tab = tabOptions.some(([value]) => value === params.get('tab')) ? params.get('tab') : 'report';
+  const tracking = params.get('tracking') === 'report' ? 'report' : 'all';
   const [page, setPage] = useState(0); const [refresh, setRefresh] = useState(0);
   const [library, setLibrary] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [selection, setSelection] = useState(null); const [loaded, setLoaded] = useState(null);
@@ -83,12 +85,20 @@ export default function DailyReportsPage() {
     {tabOptions.map(([value]) => <Box key={value} role="tabpanel" id={`daily-${value}-panel`} aria-labelledby={`daily-${value}-tab`} hidden={tab !== value}>
       {tab === value && value === 'report' && (id && library?.enabled ? <DailyReportPanel key={`${id}:${refresh}`} runId={id} onLoaded={onLoaded} onDetail={stock => setSelection({ runId: id, code: stock.code, name: stock.name })} /> : <Alert severity="info">확인할 보고서를 선택하세요. 20시 자동 분석의 보고서가 준비되면 여기에서 확인할 수 있습니다.</Alert>)}
       {tab === value && value === 'performance' && <Stack gap={2.5}>
-        <SectionCard title="선정 종목 시나리오 추적">{id && library?.enabled ? <ScenarioMonitoringPanel key={id} runId={id} onDetail={stock => setSelection({ runId: id, code: stock.code, name: stock.name })} /> : <Typography>보고서를 선택하면 선정 당시 목표·손절과 이후 진행 상황을 확인할 수 있습니다.</Typography>}</SectionCard>
+        <SectionCard title="선정 종목 시나리오 추적">
+          <Stack gap={2}>
+            <ToggleButtonGroup value={tracking} exclusive onChange={(_, value) => { if (value) { const next = new URLSearchParams(params); next.set('tracking', value); setParams(next); setSelection(null); } }} aria-label="시나리오 추적 범위">
+              <ToggleButton value="all">전체 선정 이력</ToggleButton><ToggleButton value="report">선택 보고서만</ToggleButton>
+            </ToggleButtonGroup>
+            {tracking === 'all' ? <ScenarioMonitoringOverviewPanel onDetail={row => setSelection({ runId: row.runId, code: row.code, name: row.stock?.name || row.name })} onReport={runId => { const next = new URLSearchParams(params); next.set('runId', runId); next.set('tab', 'report'); setParams(next); setSelection(null); }} />
+              : id && library?.enabled ? <ScenarioMonitoringPanel key={id} runId={id} onDetail={stock => setSelection({ runId: id, code: stock.code, name: stock.name })} /> : <Typography>보고서를 선택하면 선정 당시 목표·손절과 이후 진행 상황을 확인할 수 있습니다.</Typography>}
+          </Stack>
+        </SectionCard>
         <SectionCard title="선택 보고서의 선정 이후 성과">{id && library?.enabled ? <ReportPerformancePanel key={id} runId={id} /> : <Typography>보고서를 선택하면 해당 후보의 사후 성과를 볼 수 있습니다.</Typography>}</SectionCard>
         <SectionCard title="누적 모의계좌 · 전략 검증"><PortfolioWorkspace /></SectionCard>
       </Stack>}
       {tab === value && value === 'operations' && <SectionCard title="자동 분석 · 알림 운영 확인"><OperationsWorkspace reportId={id && ready ? id : null} /></SectionCard>}
     </Box>)}
-    {selection && selection.runId === id && <SavedUnifiedDetail key={`${selection.runId}:${selection.code}`} selection={selection} onClose={() => setSelection(null)} />}
+    {selection && <SavedUnifiedDetail key={`${selection.runId}:${selection.code}`} selection={selection} onClose={() => setSelection(null)} />}
   </Stack>;
 }

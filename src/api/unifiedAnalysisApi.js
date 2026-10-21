@@ -35,3 +35,5 @@ export async function analyzeUnifiedStock(stockCode, signal) {
   }
   return data;
 }
+
+export const listScenarioMonitoring = (params, signal) => httpClient.get('/v1/unified-analysis/monitoring', { params, signal }).then(unwrap);
