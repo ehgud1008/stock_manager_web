@@ -10,7 +10,7 @@ vi.mock('../../features/unified-analysis/PortfolioPanel', () => ({ PortfolioWork
 vi.mock('../../features/unified-analysis/ReportPerformancePanel', () => ({ default: ({ runId }) => <div>사후 성과 {runId}</div> }));
 vi.mock('../../features/unified-analysis/ScenarioMonitoringPanel', () => ({ default: ({ runId }) => <div>시나리오 추적 {runId}</div> }));
 vi.mock('../../features/unified-analysis/ScenarioMonitoringOverviewPanel', () => ({ default: ({ onDetail, onReport }) => <div>전체 선정 이력 추적<button onClick={() => onDetail({ runId: 'older-selection', code: '373220', name: 'LG에너지솔루션' })}>이전 선정 종목 상세</button><button onClick={() => onReport('older-selection')}>이전 선정 원본</button></div> }));
-vi.mock('../../features/unified-analysis/SavedUnifiedDetail', () => ({ default: ({ selection }) => <div>공통 상세 {selection.runId} {selection.code}</div> }));
+vi.mock('../../features/unified-analysis/SavedUnifiedDetail', () => ({ default: ({ selection, latest }) => <div>{latest ? '최신 상세' : '공통 상세'} {selection.runId} {selection.code}</div> }));
 const ready = { runId: 'ready', tradeDate: '2026-10-13', market: 'ALL', scanState: 'COMPLETED', reportState: 'READY' };
 const pending = { runId: 'pending', tradeDate: '2026-10-14', market: 'ALL', scanState: 'RUNNING', reportState: 'WORKING' };
 const library = { enabled: true, latestReady: ready, newestRun: pending, expectedTradeDate: '2026-10-14', reports: [pending, ready], page: 0, hasMore: false };
@@ -79,11 +79,11 @@ describe('장 마감 리포트 메뉴', () => {
     expect(screen.getByText('사후 성과 new-selection')).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('runId=new-selection');
   });
-  it('전체 이력의 상세는 현재 선택 보고서와 다른 원래 실행을 열고 단일 보고서 보기로도 전환한다', async () => {
+  it('성과 이력의 종목은 최신 분석을 열고 원본 보고서 연결은 유지한다', async () => {
     renderPage('/daily-reports?tab=performance&runId=ready');
     await screen.findByText('전체 선정 이력 추적');
     fireEvent.click(screen.getByRole('button', { name: '이전 선정 종목 상세' }));
-    expect(await screen.findByText('공통 상세 older-selection 373220')).toBeInTheDocument();
+    expect(await screen.findByText('최신 상세 older-selection 373220')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '선택 보고서만' }));
     expect(screen.getByText('시나리오 추적 ready')).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('tracking=report');

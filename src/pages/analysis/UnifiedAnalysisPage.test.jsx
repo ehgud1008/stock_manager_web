@@ -49,7 +49,8 @@ describe('시장 전체 종합분석', () => {
     fireEvent.click(screen.getByRole('tab', { name: '종목분석' }));
     expect(screen.getByRole('tabpanel', { name: '종목분석' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '종목 평가와 가격 구간' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '매수·매도 시그널' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '매매 신호와 진입 판단' })).toBeInTheDocument();
+    expect(screen.getByText(/매매판단이 저장되어 있지 않습니다/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /팩터별 점수와 근거/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '추세 구조' })).not.toBeInTheDocument();
     expect(StockChartPanel).not.toHaveBeenCalled();

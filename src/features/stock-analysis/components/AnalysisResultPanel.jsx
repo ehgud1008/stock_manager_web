@@ -2,6 +2,7 @@ import { Box, Chip, Divider, LinearProgress, Stack, Typography } from '@mui/mate
 import PropTypes from 'prop-types';
 import TradeSignalPanel from './TradeSignalPanel';
 import SignalSummary from './SignalSummary';
+import TradeJudgmentPanel from './TradeJudgmentPanel';
 
 const formatPrice = (value) => value == null ? '산출 전' : `${Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}원`;
 const formatScore = (value) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -31,6 +32,7 @@ export default function AnalysisResultPanel({ result }) {
 
   return (
     <Stack gap={2.25}>
+      {result.analysisMode === 'SWING' && <TradeJudgmentPanel judgment={result.tradeJudgment} />}
       {result.signalReport && <SignalSummary report={result.signalReport} />}
       <Box>
         <Stack direction="row" alignItems="flex-end" justifyContent="space-between" gap={1}>
@@ -80,7 +82,7 @@ export default function AnalysisResultPanel({ result }) {
         <Typography variant="caption" color="text.secondary">손익비 = (1차 목표가 − 진입 상단) ÷ (진입 상단 − 손절가). 거래비용 제외이며 매수 신호의 확정 여부와는 별개입니다.</Typography>
       </Stack>
       <Typography variant="caption" color="text.secondary">계산 버전 {result.engineVersion}</Typography>
-      <TradeSignalPanel report={result.signalReport} showSummary={false} />
+      <TradeSignalPanel report={result.signalReport} analysisPrice={result.currentPrice} showSummary={false} />
       <Stack direction="row" justifyContent="space-between" sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(139,218,99,.06)', border: '1px solid rgba(139,218,99,.12)' }}>
         <Typography variant="caption" color="primary.main">과거 표본 {result.historicalSampleCount}건</Typography>
         <Typography variant="caption" color="text.secondary">데이터 {result.dataQualityStatus}</Typography>

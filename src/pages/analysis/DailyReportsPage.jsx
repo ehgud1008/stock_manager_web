@@ -99,6 +99,6 @@ export default function DailyReportsPage() {
       </Stack>}
       {tab === value && value === 'operations' && <SectionCard title="자동 분석 · 알림 운영 확인"><OperationsWorkspace reportId={id && ready ? id : null} /></SectionCard>}
     </Box>)}
-    {selection && <SavedUnifiedDetail key={`${selection.runId}:${selection.code}`} selection={selection} onClose={() => setSelection(null)} />}
+    {selection && <SavedUnifiedDetail key={`${selection.runId}:${selection.code}`} selection={selection} latest={tab === 'performance'} onClose={() => setSelection(null)} />}
   </Stack>;
 }

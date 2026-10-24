@@ -5,6 +5,7 @@ import SectionCard from '../../components/common/SectionCard';
 import FactorScorePanel from '../stock-analysis/components/FactorScorePanel';
 import TradeSignalPanel from '../stock-analysis/components/TradeSignalPanel';
 import SignalSummary from '../stock-analysis/components/SignalSummary';
+import TradeJudgmentPanel from '../stock-analysis/components/TradeJudgmentPanel';
 import StockChartPanel from '../stock-chart/components/StockChartPanel';
 import { GAP_LABELS, signed, STAGES } from '../screener/screenerModel';
 
@@ -60,6 +61,7 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
       {showAnalysis && <Grid size={{ xs: 6, lg: section === 'all' ? 3 : 4 }}><Metric label="유효 매매 신호" caption={analysis.signalReport.completeness === 'READY' ? '확정·유지 신호' : '패턴 신호 표본 부족'}>{analysis.signalReport.completeness === 'READY' ? `${liveSignals.length}개` : '판정 보류'}</Metric></Grid>}
     </Grid>}
 
+    {showAnalysis && <TradeJudgmentPanel judgment={data.tradeJudgment} />}
     {showAnalysis && <SignalSummary report={analysis.signalReport} />}
 
     {showChart && <SectionCard title="가격 차트" caption={`차트는 조회 시점의 가격 데이터입니다. 진입·목표·손절선은 분석 가격일 ${result.priceDate} 기준이며, 차트를 조회해도 분석 결과는 바뀌지 않습니다.`}>
@@ -124,7 +126,7 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
           {screener.features?.high52Week?.coverage !== 'FULL_WINDOW' && <Typography variant="caption" color="warning.main">52주 정보는 부분 이력 또는 데이터 부족 상태입니다.</Typography>}
         </Stack>
       </SectionCard></Grid>}
-      {showAnalysis && <Grid size={{ xs: 12 }}><SectionCard><TradeSignalPanel report={analysis.signalReport} showSummary={false} /></SectionCard></Grid>}
+      {showAnalysis && <Grid size={{ xs: 12 }}><SectionCard><TradeSignalPanel report={analysis.signalReport} analysisPrice={stock.currentPrice} priceDate={result.priceDate} showSummary={false} /></SectionCard></Grid>}
     </Grid>}
 
     <Box>

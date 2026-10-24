@@ -36,13 +36,21 @@ describe('UnifiedAnalysisPage', () => {
     expect(analyzeUnifiedStock).not.toHaveBeenCalled();
   });
   it('선택한 종목의 추세, 점수, 신호와 가격 구간을 함께 표시한다', async () => {
-    analyzeUnifiedStock.mockResolvedValue(unifiedAnalysisFixture());
+    const data = unifiedAnalysisFixture();
+    data.tradeJudgment = { policyVersion: 'trade-judgment-v1', positionScope: 'UNKNOWN',
+      asOf: '2026-09-18T19:00:00Z', priceDate: '2026-09-18',
+      notHeld: { action: 'WATCH', reasons: ['진입 조건 대기'], reviewConditions: ['조건 재확인'] },
+      held: { action: 'HOLD', reasons: ['유효 추세'], reviewConditions: ['청산 조건 확인'] } };
+    analyzeUnifiedStock.mockResolvedValue(data);
     render(<UnifiedAnalysisPage />);
     await choose('삼성전자');
     fireEvent.click(screen.getByRole('button', { name: '종합분석 실행' }));
     expect(await screen.findByText('72.5')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '추세 구조' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '매수·매도 시그널' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '매매 신호와 진입 판단' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '매매판단' })).toBeInTheDocument();
+    expect(screen.getByText('보유 유지')).toBeInTheDocument();
+    expect(analyzeUnifiedStock).toHaveBeenCalledTimes(1);
     expect(screen.getByText('70,000원 ~ 71,500원')).toBeInTheDocument();
     expect(screen.getByText(/005930 · 가격일 2026-09-18/)).toBeInTheDocument();
     expect(screen.getByRole('table', { name: '종합분석 EMA' })).toBeInTheDocument();
