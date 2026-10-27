@@ -3,6 +3,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useEffect, useRef, useState } from 'react';
 import SectionCard from '../../components/common/SectionCard';
 import * as api from '../../api/unifiedAnalysisApi';
+import NewEntrySummary from '../stock-analysis/components/NewEntrySummary';
 
 
 const STATES = { DISABLED: '보고서 기능 비활성화', NOT_CREATED: '보고서 미생성', PENDING: '보고서 대기', WORKING: '보고서 작성 중', WAITING_SCAN: '전체 분석 완료 대기', RETRY_WAIT: '자료 확인 재시도', READY: '보고서 완료', FAILED: '보고서 실패' };
@@ -66,6 +67,7 @@ export default function DailyReportPanel({ runId, onDetail, onLoaded }) {
             <Typography variant="caption">시장 대비 20봉 강도 {format(stock.relativeReturn20)}%p · 비용 가정 반영 손익비 {format(stock.netRewardRisk)}배</Typography></Stack></AccordionSummary>
           <AccordionDetails><Stack gap={1.5}>
             {stock.cautions.map((text, i) => <Typography variant="body2" key={i}>{text}</Typography>)}
+            <NewEntrySummary assessment={stock.newEntry} />
             {stock.scenario && <Typography variant="body2">참고 가격: 진입 {format(stock.scenario.entryFrom)}~{format(stock.scenario.entryTo)}원 · 첫 목표 {format(stock.scenario.targets?.[0])}원 · 손절 기준 {format(stock.scenario.stopLoss)}원. 관찰 대상은 가격 구간만으로 진입 조건 충족을 뜻하지 않습니다.</Typography>}
             <Typography variant="body2">진입 구간 이탈·손절 기준 훼손·새 매도 신호 발생 시 재검토합니다. 다음 거래일 갭으로 구간을 벗어나면 추격하지 않습니다.</Typography>
             <div style={{ overflowX: 'auto' }}><Table size="small" aria-label={`${stock.name} 선정 근거`}><TableHead><TableRow>

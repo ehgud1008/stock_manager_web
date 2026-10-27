@@ -3,12 +3,16 @@ import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chec
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import * as api from '../../api/portfolioApi';
 import TelegramConnectionPanel from './TelegramConnectionPanel';
+import SelectionAuditPanel, { SelectionAuditView } from './SelectionAuditPanel';
 
 const number = (v, digits = 2) => v == null ? '미확인' : Number(v).toLocaleString('ko-KR', { maximumFractionDigits: digits });
 const percent = v => v == null ? '미확인' : `${number(v)}%`;
 const states = { PENDING: '평가 대기', WORKING: '평가 중', WAITING_DATA: '후속 자료 대기', RETRY_WAIT: '재시도 대기', COMPLETE: '평가 완료', DATA_INCOMPLETE: '기한 종료 · 자료 불완전', DATA_GAP: '가격 경로 누락', EVALUATED: '현재까지 평가됨', OPEN_UNLIQUIDATED: '기간 종료 후 미청산', FAILED: '실패', OPEN: '보유 중', CLOSED: '청산', SKIPPED: '미진입', SENT: '발송 확인', UNKNOWN: '발송 여부 미확인', SENDING: '발송 확인 중', REJECTED: '발송 거절' };
 const reasons = { DUPLICATE_HOLDING: '동일 종목 중복', POSITION_LIMIT: '보유 한도', INSUFFICIENT_CASH: '가용 현금 부족', ENTRY_GAP: '진입 범위 이탈', UNCERTAIN_FILL: '체결 불명확', STOP: '손절', GAP_STOP: '갭 손절', TARGET: '목표 도달', TIME_EXIT: '보유 기간 종료', MISSING_ENTRY_PRICE: '진입 가격 누락', MISSING_HOLDING_PATH: '보유 가격 누락', ACCOUNT_PATH_INCOMPLETE: '계좌 경로 미확인', INVALID_SCENARIO: '시나리오 오류' };
 const variants = { MARKET_FILTER: '시장 필터 적용', NO_MARKET_FILTER: '시장 필터 미적용', MARKET_FILTER_COST_STRESS: '필터 적용 · 체결 비용 증가', NO_MARKET_FILTER_COST_STRESS: '필터 미적용 · 체결 비용 증가' };
+for (const [key, label] of Object.entries({ NO_RELATIVE_STRENGTH: '상대강도 제외 조건 해제', SIGNAL_AGE4: '신호 기간 0~4봉', PATTERN_VOLUME: '패턴별 발생일 거래량' })) {
+  variants[key] = label; variants[`${key}_COST_STRESS`] = `${label} · 체결 비용 증가`;
+}
 const evidence = { EMA5_ACCELERATION: 'EMA5 기울기 가속', EMA5_20_EXPANSION: 'EMA5·20 간격 확대', FOREIGN_FLOW5: '외국인 5일 수급', INSTITUTION_FLOW5: '기관 5일 수급', STAGE_6_TO_1: '스테이지 6→1', SIGNAL_AGE: '매수 신호 경과 봉' };
 const strategy = { BREAKOUT: '돌파', PULLBACK_RECOVERY: '눌림 회복', BREAKOUT_RETEST: '돌파 재시험' };
 const terminal = state => ['COMPLETE', 'FAILED', 'DATA_INCOMPLETE', 'DISABLED'].includes(state);
@@ -33,6 +37,20 @@ function PortfolioResult({ view, result }) {
   return <Stack gap={2}>
     <Alert severity={view.input.captureMode === 'RETROSPECTIVE' ? 'warning' : 'info'}>{view.input.captureMode === 'RETROSPECTIVE' ? '과거 보고서의 사후 등록 · 독립 검증 아님' : '첫 진입 전 등록한 고정 조건의 모의계좌'}<br />승률만으로 설정을 고르지 마세요. 비용 차감 수익률·최대 낙폭·청산 표본·자료 누락을 함께 확인하세요.</Alert>
     <Typography variant="body2">등록 {view.input.registeredAt} · 평가 {result.evaluatedAt} · 자료 기준일 {result.throughDate || '미도래'}<br />초기 자금 {number(policy.initialCash, 0)}원 · 최대 {policy.maximumPositions}종목 · 종목당 {percent(policy.positionPercent)} · 왕복 수수료·세금 가정 {policy.roundTripFeeBps}bp · 편도 체결 차이 {policy.slippageBps}bp · 보유 {policy.holdingDays}거래일<br />등록 시 고정한 {view.input.cohorts.length}개 보고서 · {policy.version} · {policy.calendarVersion}</Typography>
+    <Typography variant="body2">선정 기간 {view.input.cohorts[0]?.report.tradeDate}~{view.input.cohorts.at(-1)?.report.tradeDate}. 상대강도 비교는 시장 전체 필터와 별개이며 순위는 유지합니다. 모든 비교는 운영 기준을 자동 변경하지 않습니다.</Typography>
+    <Accordion><AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>등록 시 고정한 탈락 원인과 비교별 종목 변화</AccordionSummary><AccordionDetails><Stack gap={2}>
+      {view.input.cohorts.map(cohort => <Stack key={cohort.report.runId} gap={1}>
+        <Typography fontWeight={600}>{cohort.report.tradeDate} · {cohort.report.runId.slice(0, 8)}</Typography>
+        <SelectionAuditView audit={cohort.audit} />
+        {Object.entries(cohort.unavailableComparisons || {}).map(([key, message]) => <Alert key={key} severity="warning">{variants[key] || key}: {message} 모든 선택 보고서에서 자료가 확보돼야 성과를 비교합니다.</Alert>)}
+        <DataTable label={`비교별 종목 변화 ${cohort.report.tradeDate}`} headers={['비교', '진입 후보', '추가된 종목', '빠진 종목']} rows={Object.entries({ NO_MARKET_FILTER: cohort.withoutMarketFilter || [], ...cohort.comparisons }).map(([key, stocks]) => {
+          const baseline = (cohort.baseline || []).filter(s => s.disposition === 'ENTRY_CONDITIONAL');
+          const entries = stocks.filter(s => s.disposition === 'ENTRY_CONDITIONAL');
+          const names = list => list.map(s => `${s.name} (${s.code})`).join(', ') || '없음';
+          return [variants[key] || key, entries.length, names(entries.filter(s => !baseline.some(b => b.code === s.code))), names(baseline.filter(s => !entries.some(b => b.code === s.code)))];
+        })} />
+      </Stack>)}
+    </Stack></AccordionDetails></Accordion>
     <DataTable label="모의계좌 비교" headers={['비교 조건', '평가 상태', '총 평가액(원)', '순수익률', '최대 낙폭', '청산 승률', '진입/청산', '보유/미확인', '미진입']} rows={result.variants.map(item => [variants[item.name], states[item.state] || item.state, number(item.finalEquity, 0), percent(item.returnPercent), percent(item.maximumDrawdownPercent), percent(item.metrics.winRatePercent), `${item.metrics.entered}/${item.metrics.closed}`, `${item.metrics.open}/${item.metrics.unresolved}`, item.metrics.skipped])} />
     <TextField select label="상세 비교 조건" value={variantName} onChange={e => setVariantName(e.target.value)}>{result.variants.map(item => <MenuItem key={item.name} value={item.name}>{variants[item.name]}</MenuItem>)}</TextField>
     {v && <>
@@ -80,7 +98,7 @@ export function PortfolioWorkspace() {
     if (action.current) return; action.current = true; setBusy(true); setError('');
     try {
       const request = { reportIds: [...selected].sort(), initialCash: Number(cash), maximumPositions: Number(limit), positionPercent: Number(allocation) };
-      const key = sessionKey('stock-portfolio-request', JSON.stringify(request)); const data = await api.createPortfolio(request, key);
+      const key = sessionKey('stock-portfolio-research-v2-request', JSON.stringify(request)); const data = await api.createPortfolio(request, key);
       if (mounted.current) { setId(data.id); setRefresh(n => n + 1); }
     } catch (e) { if (mounted.current) setError(e.message); } finally { action.current = false; if (mounted.current) setBusy(false); }
   };
@@ -91,7 +109,9 @@ export function PortfolioWorkspace() {
     {!listing && !error && <LinearProgress aria-label="누적 성과 조회 중" />}
     {listing && !listing.enabled && <Alert severity="info">누적 모의계좌 비활성화</Alert>}
     {listing?.enabled && <>
+      <SelectionAuditPanel reports={listing.reports} />
       <Alert severity="info">선택한 보고서를 시간순으로 하나의 현금 계좌에서 재생합니다. 실제 매매가 아닙니다. 비교 대상 보고서와 자금 조건은 등록 후 고정됩니다.</Alert>
+      <Alert severity="info">새 평가는 v4 보고서에서 시장 필터·상대강도·신호 기간·거래량을 각각 한 조건씩 비교합니다. 신호 기간은 0~4봉까지만 허용하며 만료 신호는 제외합니다. 거래량 대안은 돌파 발생일/직전 20일 평균 1.2배, 회복·재지지 발생일/전일 1배 이상 및 선정일 거래량 양수입니다. 원본 자료가 없으면 해당 비교를 보류합니다.</Alert>
       <Accordion><AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>평가할 보고서 선택 ({selected.length}/60)</AccordionSummary><AccordionDetails><Stack sx={{ maxHeight: 320, overflow: 'auto' }}>
         {!listing.reports.length && <Typography>확정된 전체 시장 보고서가 없습니다.</Typography>}
         {listing.reports.map(report => <FormControlLabel key={report.id} control={<Checkbox disabled={busy} checked={selected.includes(report.id)} onChange={e => setSelected(old => e.target.checked ? [...old, report.id] : old.filter(x => x !== report.id))} />} label={`${report.tradeDate} · ${report.candidates}종목 · ${report.id.slice(0, 8)} · ${report.version}`} />)}

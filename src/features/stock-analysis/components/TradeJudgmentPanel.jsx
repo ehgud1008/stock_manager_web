@@ -1,5 +1,6 @@
 import { Alert, Box, Chip, Stack, Typography } from '@mui/material';
 import PropTypes from 'prop-types';
+import NewEntrySummary from './NewEntrySummary';
 
 const ACTIONS = {
   STRONG_BUY_CANDIDATE: ['적극 매수 후보', 'success'], BUY_CANDIDATE: ['매수 후보', 'success'],
@@ -24,6 +25,7 @@ export default function TradeJudgmentPanel({ judgment }) {
       return <Box key={key}>
         <Stack direction="row" alignItems="center" gap={1} mb={0.75}><Typography fontWeight={700}>{title}</Typography><Chip size="small" label={label} color={color} variant="outlined" /></Stack>
         {decision?.reasons?.map(reason => <Typography key={reason} variant="body2">{reason}</Typography>)}
+        {key === 'notHeld' && <NewEntrySummary assessment={judgment.newEntry} />}
         {decision?.reviewConditions?.map(condition => <Typography key={condition} variant="body2" color="text.secondary" mt={0.5}>재검토 조건: {condition}</Typography>)}
       </Box>;
     })}

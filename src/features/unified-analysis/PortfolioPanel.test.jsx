@@ -35,6 +35,20 @@ describe('누적 모의계좌와 운영 확인', () => {
     fireEvent.click(screen.getByRole('button', { name: '모의계좌 평가 등록' })); await screen.findByText('응답 유실');
     expect(api.createPortfolio.mock.calls[1][1]).toBe(key); expect(api.createPortfolio.mock.calls[0][0].reportIds).toEqual(['report-a']);
   });
+  it('조건별 비교의 종목 변화와 자료 보류를 함께 표시한다', async () => {
+    const original = { code: '001', name: '기존종목', disposition: 'ENTRY_CONDITIONAL' };
+    const added = { code: '002', name: '추가종목', disposition: 'ENTRY_CONDITIONAL' };
+    const cohort = { ...view.input.cohorts[0], baseline: [original], withoutMarketFilter: [original], comparisons: { PATTERN_VOLUME: [added] }, unavailableComparisons: { SIGNAL_AGE4: '원본 자료 부족' } };
+    const research = { ...view, input: { ...view.input, cohorts: [cohort] }, result: { ...result, variants: [...result.variants, { ...result.variants[0], name: 'PATTERN_VOLUME' }] } };
+    api.listPortfolios.mockResolvedValue({ ...listing, runs: [{ id: view.id, state: view.state, revision: 1 }] }); api.getPortfolio.mockResolvedValue(research);
+    render(<PortfolioPanel />); openPortfolio();
+    fireEvent.click(await screen.findByText('등록 시 고정한 탈락 원인과 비교별 종목 변화'));
+    const table = screen.getByRole('table', { name: '비교별 종목 변화 2026-10-13' });
+    expect(table).toHaveTextContent('패턴별 발생일 거래량'); expect(table).toHaveTextContent('추가종목 (002)'); expect(table).toHaveTextContent('기존종목 (001)');
+    expect(screen.getByText(/신호 기간 0~4봉: 원본 자료 부족/)).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: '모의계좌 비교' })).toHaveTextContent('패턴별 발생일 거래량');
+    expect(api.createPortfolio).not.toHaveBeenCalled(); expect(api.sendTelegramTest).not.toHaveBeenCalled();
+  });
   it('미리보기는 발송하지 않으며 테스트는 명시적으로 확인해야 한다', async () => {
     api.getOperations.mockResolvedValue(ops); api.previewReport.mockResolvedValue({ runId: report.id, text: '알림 미리보기 내용' }); api.sendTelegramTest.mockResolvedValue({ state: 'SENT', key: 'test' });
     render(<PortfolioPanel reportId={report.id} />); openOps();
