@@ -37,3 +37,8 @@ export async function analyzeUnifiedStock(stockCode, signal) {
 }
 
 export const listScenarioMonitoring = (params, signal) => httpClient.get('/v1/unified-analysis/monitoring', { params, signal }).then(unwrap);
+
+export const setMonitoringVisibility = (runId, code, restore = false) => {
+  const path = `/v1/unified-analysis/monitoring/${encodeURIComponent(runId)}/stocks/${encodeURIComponent(code)}`;
+  return (restore ? httpClient.post(`${path}/restore`) : httpClient.delete(path)).then(unwrap);
+};
