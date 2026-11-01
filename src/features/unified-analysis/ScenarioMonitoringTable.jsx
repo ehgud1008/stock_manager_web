@@ -3,6 +3,8 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Accordion, Accordion
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 
 const STATES = { WAITING_ENTRY_DAY: '다음 거래일 진입 확인 대기', IN_PROGRESS: '시나리오 진행 중', TARGET_REACHED: '1차 목표 도달', STOP_REACHED: '손절 기준 도달', AMBIGUOUS: '목표·손절 동시 접촉 · 순서 미확인', NO_ENTRY: '진입 조건 미충족', WATCH_ONLY: '관찰 대상 · 진입 가정 없음', PERIOD_ENDED: '20거래일 추적 종료', WAITING_DATA: '마감 자료 대기', DATA_GAP: '경로 미확인', NO_SCENARIO: '저장된 가격 시나리오 없음', BASELINE_MISSING: '선정일 원본 확인 필요', CALENDAR_UNAVAILABLE: '거래일 달력 확인 필요', REPORT_LATE: '장 시작 전 확정 여부 확인 필요' };
+const SELECTION = { SUCCESS: '선정 성공 · 목표 달성', FAILURE_STOP: '선정 실패 · 손절 도달', FAILURE_TIMEOUT: '선정 실패 · 20거래일 목표 미달', IN_PROGRESS: '선정 평가 진행 중', WAITING: '선정 평가 대기', WAITING_DATA: '선정 평가 · 마감 자료 대기', DEFERRED: '선정 판정 보류 · 자료 확인 필요', AMBIGUOUS: '선정 판정 불가 · 선후 미확인' };
+const selectionColor = result => result === 'SUCCESS' ? 'success' : result?.startsWith('FAILURE') || result === 'AMBIGUOUS' ? 'warning' : 'info';
 const DATA = { NOT_DUE: '후속 거래일 대기', CURRENT: '확보한 일봉 확인 완료', WAITING_DATA: '당일 마감 자료 대기', DATA_GAP: '누락·부적합 자료 확인 필요' };
 const QUALITY = { MISSING: '자료 대기', PRICE_BASIS_CHANGED: '수정주가 기준 변경', INVALID_SOURCE: '자료 부적합', IDENTITY_MISMATCH: '종목 불일치' };
 const number = value => value == null ? '미확인' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
@@ -16,7 +18,7 @@ export default function ScenarioMonitoringTable({ rows, showSelection = false, o
   if (showSelection) return <CompactMonitoringTable rows={rows} onDetail={onDetail} onReport={onReport} onRemove={onRemove} deleted={deleted} busy={busy} />;
   return <Stack gap={1.5}>
     <div style={{ overflowX: 'auto' }}><Table size="small" aria-label={showSelection ? '전체 선정 종목 시나리오 추적' : '선정 종목 시나리오 추적'}><TableHead><TableRow>
-      {[...(showSelection ? ['선정일 / 추적 기간'] : []), '종목', '고정 진입 구간', '고정 1차 목표 / 손절', '최근 확인 일봉', '시나리오 상태', '종가 기준 거리'].map(label => <TableCell key={label}>{label}</TableCell>)}
+      {[...(showSelection ? ['선정일 / 추적 기간'] : []), '종목', '고정 진입 구간', '고정 1차 목표 / 손절', '최근 확인 일봉', '선정 평가 / 매매 평가', '종가 기준 거리'].map(label => <TableCell key={label}>{label}</TableCell>)}
     </TableRow></TableHead><TableBody>{rows.map(row => {
       const stock = row.stock;
       return <TableRow key={`${row.runId}:${row.code}`}>
@@ -26,7 +28,7 @@ export default function ScenarioMonitoringTable({ rows, showSelection = false, o
           <TableCell sx={{ minWidth: 155 }}>{stock.scenario ? `${price(stock.scenario.entryFrom)} ~ ${price(stock.scenario.entryTo)}` : '시나리오 없음'}</TableCell>
           <TableCell sx={{ minWidth: 160 }}>목표 {price(stock.scenario?.targets?.[0])}<br />손절 {price(stock.scenario?.stopLoss)}</TableCell>
           <TableCell sx={{ minWidth: 150 }}>{stock.latestPriceDate || '후속 일봉 대기'}<br />{price(stock.latestClose)}<br />선정일 대비 {pct(stock.selectionReturnPercent)}<br />확인 {stock.observedDays}/{stock.expectedDays}거래일</TableCell>
-          <TableCell sx={{ minWidth: 210 }}><Chip size="small" color={color(stock.status)} label={STATES[stock.status] || stock.status} /><Typography variant="caption" display="block" mt={1}>{DATA[stock.dataState] || stock.dataState}</Typography>{stock.entryDate && <Typography variant="caption" display="block">모의 진입 조건 확인 {stock.entryDate}</Typography>}{stock.eventDate && <Typography variant="caption" display="block">판정일 {stock.eventDate}</Typography>}</TableCell>
+          <TableCell sx={{ minWidth: 210 }}>{stock.selectionOutcome && <Typography variant="body2" fontWeight={600}>{SELECTION[stock.selectionOutcome.result]}{stock.selectionOutcome.eventDate && ` · ${stock.selectionOutcome.eventDate}`}</Typography>}<Typography variant="caption" display="block">매매 평가</Typography><Chip size="small" color={color(stock.status)} label={STATES[stock.status] || stock.status} /><Typography variant="caption" display="block" mt={1}>{DATA[stock.dataState] || stock.dataState}</Typography>{stock.entryDate && <Typography variant="caption" display="block">모의 진입 조건 확인 {stock.entryDate}</Typography>}{stock.eventDate && <Typography variant="caption" display="block">판정일 {stock.eventDate}</Typography>}</TableCell>
           <TableCell sx={{ minWidth: 150 }}>1차 목표까지 {pct(stock.targetDistancePercent)}<br />손절까지 여유 {pct(stock.stopDistancePercent)}<Typography variant="caption" display="block">최근 확인 종가 대비 · 음수는 기준 통과</Typography></TableCell>
         </>}
       </TableRow>;
@@ -56,12 +58,21 @@ export default function ScenarioMonitoringTable({ rows, showSelection = false, o
 function OutcomeDetails({ stock }) {
   const result = stock.outcome;
   if (!result) return <Alert severity="info">이 응답에는 새 검증 요약이 없습니다. 서버 업데이트 후 새로고침하세요.</Alert>;
+  const selection = stock.selectionOutcome;
   return <Stack gap={1}>
+    {selection && <Stack gap={0.5}>
+      <Typography fontWeight={700}>선정 평가</Typography>
+      <Alert severity={selectionColor(selection.result)}>{selection.summary}</Alert>
+      {selection.eventCloseReturnPercent != null && <Typography variant="body2">판정일 종가의 선정일 대비 변화 {pct(selection.eventCloseReturnPercent)} · 매매 수익률이 아닙니다.</Typography>}
+      <Typography variant="caption">선정 다음 거래일부터 최대 20거래일 · 1차 목표 선행 도달은 성공, 손절 선행 도달 또는 기간 내 목표 미달은 실패. 관찰·미진입도 평가하며 이후 가격으로 최초 판정을 바꾸지 않습니다.</Typography>
+    </Stack>}
+    <Typography fontWeight={700}>매매 평가</Typography>
     <Alert severity={result.result === 'AMBIGUOUS' ? 'warning' : 'info'}>{result.summary}</Alert>
-    <Typography>모의 진입 {result.entryDate || '없음'} · {price(result.entryPrice)} / 모의 청산 {result.exitDate || '미확정'} · {price(result.exitPrice)}</Typography>
+    {result.entryPrice != null ? <><Typography>모의 진입 {result.entryDate || '없음'} · {price(result.entryPrice)} / 모의 청산 {result.exitDate || '미확정'} · {price(result.exitPrice)}</Typography>
     <Typography>비용 차감 전 손익 {pct(result.grossReturnPercent)} · 비용 반영 모의 수익 {pct(result.netReturnPercent)} · 미청산 평가손익 {pct(result.markedReturnPercent)}</Typography>
     {result.conservativeReturnPercent != null && <Alert severity="warning">선후 순서를 확인할 수 없어 확정 손익이 아닙니다. 손절 우선 가정 모의 손익: {pct(result.conservativeReturnPercent)}</Alert>}
     <Typography variant="body2">확인된 모의 보유 {result.holdingDays}거래일 · 왕복 수수료·세금 {result.roundTripFeeBps}bp · 편도 체결 차이 {result.slippageBps}bp</Typography>
+    </> : <Typography variant="body2">{result.result === 'WATCH_ONLY' || result.result === 'NO_ENTRY' ? '미진입 · 모의 손익 산정 대상 아님' : '진입 미확정 · 모의 손익 판정 대기'}</Typography>}
     <Typography variant="caption">{result.policyVersion} · 현재 비용 가정으로 조회한 모의 결과입니다. 실제 체결 및 별도 등록 평가의 고정 정책과 구분합니다.</Typography>
   </Stack>;
 }
@@ -71,15 +82,15 @@ function CompactMonitoringTable({ rows, onDetail, onReport, onRemove, deleted, b
   const detail = selected && (rows.find(row => row.runId === selected.runId && row.code === selected.code) || selected);
   return <>
     <div style={{ overflowX: 'auto' }}><Table size="small" aria-label="전체 선정 종목 시나리오 추적"><TableHead><TableRow>
-      {['선정일', '종목', '검증 결과', '모의 손익', '최근 확인', '관리'].map(label => <TableCell key={label}>{label}</TableCell>)}
+      {['선정일', '종목', '선정 평가', '매매 평가 / 모의 손익', '최근 확인', '관리'].map(label => <TableCell key={label}>{label}</TableCell>)}
     </TableRow></TableHead><TableBody>{rows.map(row => {
       const stock = row.stock; const outcome = stock?.outcome;
       const label = { TIME_PROFIT: '기간 종료 · 수익', TIME_LOSS: '기간 종료 · 손실', TIME_FLAT: '기간 종료 · 보합' }[outcome?.result] || STATES[stock?.status] || '자료 확인 필요';
       return <TableRow key={`${row.runId}:${row.code}`}>
         <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.selectionDate}<Typography variant="caption" display="block">{row.runId.slice(0, 8)}</Typography></TableCell>
         <TableCell sx={{ minWidth: 140, maxWidth: 220 }}><Typography noWrap title={stock?.name || row.name}>{onDetail ? <Button onClick={() => onDetail(row)} sx={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock?.name || row.name}</Button> : stock?.name || row.name}</Typography><Typography variant="caption">{row.code}</Typography></TableCell>
-        <TableCell sx={{ maxWidth: 230 }}><Typography variant="body2">{label}</Typography>{!stock ? <Typography color="error">추적 자료를 조회하지 못했습니다</Typography> : <Typography variant="caption" display="block">{stock.eventDate || DATA[stock.dataState]}</Typography>}</TableCell>
-        <TableCell sx={{ whiteSpace: 'nowrap' }}>{outcome?.netReturnPercent != null ? <>종료 {pct(outcome.netReturnPercent)}</> : outcome?.markedReturnPercent != null ? <>평가 {pct(outcome.markedReturnPercent)}</> : '미확정'}{outcome?.result === 'AMBIGUOUS' && <Typography variant="caption" display="block">순서 미확인</Typography>}</TableCell>
+        <TableCell sx={{ maxWidth: 230 }}><Typography variant="body2">{stock?.selectionOutcome ? SELECTION[stock.selectionOutcome.result] : '선정 평가 미제공'}</Typography>{!stock ? <Typography color="error">추적 자료를 조회하지 못했습니다</Typography> : <Typography variant="caption" display="block">{stock.selectionOutcome?.eventDate || DATA[stock.dataState]}</Typography>}</TableCell>
+        <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="caption" display="block">{label}</Typography>{outcome?.netReturnPercent != null ? <>종료 {pct(outcome.netReturnPercent)}</> : outcome?.markedReturnPercent != null ? <>평가 {pct(outcome.markedReturnPercent)}</> : ['WATCH_ONLY', 'NO_ENTRY'].includes(outcome?.result) ? '손익 산정 대상 아님' : '미확정'}{outcome?.result === 'AMBIGUOUS' && <Typography variant="caption" display="block">순서 미확인</Typography>}</TableCell>
         <TableCell sx={{ whiteSpace: 'nowrap' }}>{stock?.latestPriceDate || '후속 일봉 대기'}<Typography variant="caption" display="block">선정일 대비 {pct(stock?.selectionReturnPercent)}</Typography></TableCell>
         <TableCell><Stack direction="row" flexWrap="wrap"><Button size="small" onClick={() => setSelected(row)}>상세보기</Button>{onReport && <Button size="small" onClick={() => onReport(row.runId)}>원본 보고서</Button>}{onRemove && <Button size="small" color={deleted ? 'primary' : 'error'} disabled={busy} onClick={() => onRemove(row)}>{deleted ? '복원' : '목록에서 삭제'}</Button>}</Stack></TableCell>
       </TableRow>;

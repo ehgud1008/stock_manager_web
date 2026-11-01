@@ -9,6 +9,17 @@ const report = { status: 'READY', tradeDate: '2026-10-13', forecastDate: '2026-1
   candidates: [], limitations: ['업종과 공시는 미확인'], assessedStocks: 100, eligibleStocks: 110, version: 'candidate-market-v1' };
 describe('장 마감 보고서', () => {
   beforeEach(() => { vi.resetAllMocks(); api.getDailyReport.mockResolvedValue({ state: 'READY', report, notificationState: 'DISABLED' }); });
+  it('shows B comparison and signal waiting separately when operating selections are empty', async () => {
+    const stock = { code: '001', name: '비교종목', cautions: ['운영 후보 아님'], newEntry: { status: 'WATCH', suitability: { tier: 'B', score: 75, weaknesses: [] }, timing: { status: 'ELIGIBLE', reasons: [], signalWaiting: false } } };
+    api.getDailyReport.mockResolvedValue({ state: 'READY', report: { ...report, tierLists: { comparisonB: [stock], comparisonBTotal: 3, signalWaiting: [], signalWaitingTotal: 0 } } });
+    const detail = vi.fn();render(<DailyReportPanel runId="tiers" onDetail={detail} />);
+    expect(await screen.findByText('B등급 비교 후보 3종목 · 표시 1종목')).toBeInTheDocument();
+    expect(screen.getByText('조건부 진입 0종목 · 관찰 0종목')).toBeInTheDocument();
+    expect(screen.getByText('A/B등급 신호 대기 0종목 · 표시 0종목')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('비교종목 (001) · B등급 · 75점'));
+    fireEvent.click(screen.getByRole('button', { name: '저장된 종목 분석 보기' }));expect(detail).toHaveBeenCalledWith(stock);
+    expect(api.requestDailyReport).not.toHaveBeenCalled();
+  });
   it('비활성화 상태에서는 생성 버튼과 후보 없음 판정을 표시하지 않는다', async () => {
     api.getDailyReport.mockResolvedValue({ state: 'DISABLED', notificationState: 'DISABLED' });
     render(<DailyReportPanel runId="r1" onDetail={vi.fn()} />);

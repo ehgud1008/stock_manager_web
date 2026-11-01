@@ -10,7 +10,7 @@ const percent = v => v == null ? '미확인' : `${number(v)}%`;
 const states = { PENDING: '평가 대기', WORKING: '평가 중', WAITING_DATA: '후속 자료 대기', RETRY_WAIT: '재시도 대기', COMPLETE: '평가 완료', DATA_INCOMPLETE: '기한 종료 · 자료 불완전', DATA_GAP: '가격 경로 누락', EVALUATED: '현재까지 평가됨', OPEN_UNLIQUIDATED: '기간 종료 후 미청산', FAILED: '실패', OPEN: '보유 중', CLOSED: '청산', SKIPPED: '미진입', SENT: '발송 확인', UNKNOWN: '발송 여부 미확인', SENDING: '발송 확인 중', REJECTED: '발송 거절' };
 const reasons = { DUPLICATE_HOLDING: '동일 종목 중복', POSITION_LIMIT: '보유 한도', INSUFFICIENT_CASH: '가용 현금 부족', ENTRY_GAP: '진입 범위 이탈', UNCERTAIN_FILL: '체결 불명확', STOP: '손절', GAP_STOP: '갭 손절', TARGET: '목표 도달', TIME_EXIT: '보유 기간 종료', MISSING_ENTRY_PRICE: '진입 가격 누락', MISSING_HOLDING_PATH: '보유 가격 누락', ACCOUNT_PATH_INCOMPLETE: '계좌 경로 미확인', INVALID_SCENARIO: '시나리오 오류' };
 const variants = { MARKET_FILTER: '시장 필터 적용', NO_MARKET_FILTER: '시장 필터 미적용', MARKET_FILTER_COST_STRESS: '필터 적용 · 체결 비용 증가', NO_MARKET_FILTER_COST_STRESS: '필터 미적용 · 체결 비용 증가' };
-for (const [key, label] of Object.entries({ NO_RELATIVE_STRENGTH: '상대강도 제외 조건 해제', SIGNAL_AGE4: '신호 기간 0~4봉', PATTERN_VOLUME: '패턴별 발생일 거래량' })) {
+for (const [key, label] of Object.entries({ NO_RELATIVE_STRENGTH: '상대강도 제외 조건 해제', SIGNAL_AGE4: '신호 기간 0~4봉', PATTERN_VOLUME: '패턴별 발생일 거래량', TIER_A_B: 'A+B등급 비교', TIER_B_ONLY: 'B등급 단독 비교' })) {
   variants[key] = label; variants[`${key}_COST_STRESS`] = `${label} · 체결 비용 증가`;
 }
 const evidence = { EMA5_ACCELERATION: 'EMA5 기울기 가속', EMA5_20_EXPANSION: 'EMA5·20 간격 확대', FOREIGN_FLOW5: '외국인 5일 수급', INSTITUTION_FLOW5: '기관 5일 수급', STAGE_6_TO_1: '스테이지 6→1', SIGNAL_AGE: '매수 신호 경과 봉' };
@@ -51,13 +51,13 @@ function PortfolioResult({ view, result }) {
         })} />
       </Stack>)}
     </Stack></AccordionDetails></Accordion>
-    <DataTable label="모의계좌 비교" headers={['비교 조건', '평가 상태', '총 평가액(원)', '순수익률', '최대 낙폭', '청산 승률', '진입/청산', '보유/미확인', '미진입']} rows={result.variants.map(item => [variants[item.name], states[item.state] || item.state, number(item.finalEquity, 0), percent(item.returnPercent), percent(item.maximumDrawdownPercent), percent(item.metrics.winRatePercent), `${item.metrics.entered}/${item.metrics.closed}`, `${item.metrics.open}/${item.metrics.unresolved}`, item.metrics.skipped])} />
+    <DataTable label="모의계좌 비교" headers={['비교 조건', '평가 상태', '총 평가액(원)', '순수익률', '최대 낙폭', '청산 승률', '손절 비율', '진입/청산', '보유/미확인', '미진입']} rows={result.variants.map(item => [variants[item.name], states[item.state] || item.state, number(item.finalEquity, 0), percent(item.returnPercent), percent(item.maximumDrawdownPercent), percent(item.metrics.winRatePercent), percent(item.metrics.stopRatePercent), `${item.metrics.entered}/${item.metrics.closed}`, `${item.metrics.open}/${item.metrics.unresolved}`, item.metrics.skipped])} />
     <TextField select label="상세 비교 조건" value={variantName} onChange={e => setVariantName(e.target.value)}>{result.variants.map(item => <MenuItem key={item.name} value={item.name}>{variants[item.name]}</MenuItem>)}</TextField>
     {v && <>
       <Typography variant="body2">평균 청산 순수익률 {percent(v.metrics.meanReturnPercent)} · 평균 이익 {percent(v.metrics.meanWinPercent)} · 평균 손실 {percent(v.metrics.meanLossPercent)} · 이익/손실 합계 비 {number(v.metrics.profitFactor)} · 연속 손실 청산일 {v.metrics.consecutiveLosingExitDates}일 · 진입률 {percent(v.metrics.fillRatePercent)}</Typography>
-      <TextField select label="통계 분류" value={category} onChange={e => setCategory(e.target.value)}>{Object.entries({ STRATEGY: '전략', EVIDENCE: '선정 근거', MARKET: '시장 국면', VERSION: '선정 규칙 버전' }).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
-      <Alert severity="info">근거별 표본은 서로 중복됩니다. 표본 수가 적거나 손실 표본이 없으면 승률·이익/손실 비를 일반화할 수 없습니다. 미확인을 0으로 처리하지 않습니다.</Alert>
-      <DataTable label="전략과 근거별 통계" headers={['분류', '진입/청산', '보유/미확인', '승률', '평균 순수익률', '평균 이익', '평균 손실', '실현손익(원)', '이익/손실 비']} rows={Object.entries(v.groups).filter(([key]) => key.startsWith(`${category}/`)).map(([key, m]) => [groupLabel(key), `${m.entered}/${m.closed}`, `${m.open}/${m.unresolved}`, percent(m.winRatePercent), percent(m.meanReturnPercent), percent(m.meanWinPercent), percent(m.meanLossPercent), number(m.realizedProfit, 0), number(m.profitFactor)])} />
+      <TextField select label="통계 분류" value={category} onChange={e => setCategory(e.target.value)}>{Object.entries({ TIER: '적합도 티어', STRATEGY: '전략', EVIDENCE: '선정 근거', MARKET: '시장 국면', VERSION: '선정 규칙 버전' }).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}</TextField>
+      <Alert severity="info">손절 비율은 청산 거래 중 손절·갭 손절의 비율입니다. 티어별 최대 낙폭은 A 운영 기준과 B등급 단독 비교의 계좌 결과에서 확인합니다. 근거별 표본은 서로 중복됩니다. 표본 수가 적거나 손실 표본이 없으면 승률·이익/손실 비를 일반화할 수 없습니다. 미확인을 0으로 처리하지 않습니다.</Alert>
+      <DataTable label="전략과 근거별 통계" headers={['분류', '진입/청산', '보유/미확인', '승률', '손절 비율', '평균 순수익률', '평균 이익', '평균 손실', '실현손익(원)', '이익/손실 비']} rows={Object.entries(v.groups).filter(([key]) => key.startsWith(`${category}/`)).map(([key, m]) => [groupLabel(key), `${m.entered}/${m.closed}`, `${m.open}/${m.unresolved}`, percent(m.winRatePercent), percent(m.stopRatePercent), percent(m.meanReturnPercent), percent(m.meanWinPercent), percent(m.meanLossPercent), number(m.realizedProfit, 0), number(m.profitFactor)])} />
       <Accordion><AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>거래 내역과 일별 계좌 평가</AccordionSummary><AccordionDetails><Stack gap={2}>
         <DataTable label="모의 거래 내역" headers={['종목 / 보고서', '전략', '상태 / 사유', '진입 / 청산일', '수량', '진입 / 청산가', '실현손익(원)', '평가손익(원)', '순수익률']} rows={v.trades.map(t => [`${t.name} (${t.code}) · ${t.reportId.slice(0, 8)}`, strategy[t.strategy] || t.strategy, `${states[t.state] || t.state} · ${reasons[t.reason] || t.reason || '—'}${t.ambiguous ? ' · 동일 봉 손절 우선' : ''}`, `${t.entryDate || '—'} / ${t.exitDate || '—'}`, t.quantity, `${number(t.entryPrice)} / ${number(t.exitPrice)}`, number(t.netProfit), number(t.markedProfit), percent(t.netReturnPercent)])} />
         <DataTable label="일별 계좌 평가" headers={['거래일', '현금(원)', '총 평가액(원)', '낙폭', '보유 종목']} rows={v.curve.map(p => [p.date, number(p.cash, 0), number(p.equity, 0), percent(p.drawdownPercent), p.holdings])} />
@@ -98,7 +98,7 @@ export function PortfolioWorkspace() {
     if (action.current) return; action.current = true; setBusy(true); setError('');
     try {
       const request = { reportIds: [...selected].sort(), initialCash: Number(cash), maximumPositions: Number(limit), positionPercent: Number(allocation) };
-      const key = sessionKey('stock-portfolio-research-v2-request', JSON.stringify(request)); const data = await api.createPortfolio(request, key);
+      const key = sessionKey('stock-portfolio-tier-v3-request', JSON.stringify(request)); const data = await api.createPortfolio(request, key);
       if (mounted.current) { setId(data.id); setRefresh(n => n + 1); }
     } catch (e) { if (mounted.current) setError(e.message); } finally { action.current = false; if (mounted.current) setBusy(false); }
   };

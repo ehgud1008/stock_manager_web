@@ -8,6 +8,18 @@ const assessment = {
   signals: [{ signalId: 'newer', type: 'BREAKOUT', ageBars: 0, eligible: false, reasons: ['두 진입 구간이 겹치지 않습니다.'] }],
 };
 describe('NewEntrySummary', () => {
+  it('does not round a B score into the A boundary', () => {
+    render(<NewEntrySummary assessment={{ ...assessment, status: 'WATCH', suitability: { tier: 'B', score: 79.9999, weaknesses: [] }, timing: { status: 'ELIGIBLE', reasons: [] } }} />);
+    expect(screen.getByText('적합도 B등급 · 79.9999점')).toBeInTheDocument();
+    expect(screen.queryByText('적합도 B등급 · 80점')).not.toBeInTheDocument();
+  });
+  it('separates B suitability and valid timing from operating permission', () => {
+    render(<NewEntrySummary assessment={{ ...assessment, status: 'WATCH', suitability: { tier: 'B', score: 75, weaknesses: ['거래량 점수 낮음'] }, timing: { status: 'ELIGIBLE', signalWaiting: false, reasons: ['점수 외 조건 통과'] } }} />);
+    expect(screen.getByText('적합도 B등급 · 75점')).toBeInTheDocument();
+    expect(screen.getByText('진입 상태: 점수 외 진입 조건 충족')).toBeInTheDocument();
+    expect(screen.getByText(/운영 신규 진입 보류/)).toBeInTheDocument();
+    expect(screen.getByText(/주요 감점: 거래량 점수 낮음/)).toBeInTheDocument();
+  });
   it('shows the selected signal, effective range and rejected signal reason', () => {
     render(<NewEntrySummary assessment={assessment} />);
     expect(screen.getByText(/눌림 회복 · 발생일 2026-10-22 · 경과 2봉/)).toBeInTheDocument();
