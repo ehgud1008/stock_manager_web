@@ -62,7 +62,7 @@ export default function DailyReportPanel({ runId, onDetail, onLoaded }) {
         {report.tierLists && <Typography variant="h6">A등급 운영 선정</Typography>}
         <Typography variant="subtitle1">조건부 진입 {report.candidates.filter(stock => stock.disposition === 'ENTRY_CONDITIONAL').length}종목 · 관찰 {report.candidates.filter(stock => stock.disposition === 'WATCH').length}종목</Typography>
         {!!report.candidates.length && !report.candidates.some(stock => stock.disposition === 'ENTRY_CONDITIONAL') && <Alert severity="warning">오늘은 진입 조건을 충족한 종목이 없습니다. 아래는 관찰 대상입니다.</Alert>}
-        {!report.candidates.length && <Alert severity="info">오늘은 조건을 충족한 종목이 없습니다</Alert>}
+        {!report.candidates.length && <Alert severity="info">{report.tierLists?.activeSignalsTotal > 0 ? '운영 선정 조건을 모두 충족한 종목은 없습니다. 유효 매수 신호와 보류 사유를 아래에서 확인하세요.' : '오늘은 조건을 충족한 종목이 없습니다'}</Alert>}
         {report.candidates.map(stock => <Accordion key={stock.code} disableGutters>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}><Stack gap={0.5}><Typography fontWeight={650}>{stock.name} ({stock.code}) · {stock.disposition === 'WATCH' ? '관찰 대상' : '조건부 진입 검토'}</Typography>
             <Typography variant="caption">시장 대비 20봉 강도 {format(stock.relativeReturn20)}%p · 비용 가정 반영 손익비 {format(stock.netRewardRisk)}배</Typography></Stack></AccordionSummary>
@@ -82,11 +82,12 @@ export default function DailyReportPanel({ runId, onDetail, onLoaded }) {
         </Accordion>)}
         {report.tierLists && <>
           <Alert severity="info">A ≥80 · B 70~80 미만 · C 65~70 미만 · D 65 미만 · 미산정은 자료 확인 대상입니다. 아래 목록은 운영 선정 건수에 포함하지 않습니다.</Alert>
-          {[['B등급 비교 후보', report.tierLists.comparisonB, report.tierLists.comparisonBTotal], ['A/B등급 신호 대기', report.tierLists.signalWaiting, report.tierLists.signalWaitingTotal]].map(([label, stocks, total]) => <Stack key={label} gap={1}>
+          {[...(report.tierLists.activeSignals ? [['A/B등급 유효 매수 신호', report.tierLists.activeSignals, report.tierLists.activeSignalsTotal]] : []), ['B등급 비교 후보', report.tierLists.comparisonB, report.tierLists.comparisonBTotal], ['A/B등급 신호 대기', report.tierLists.signalWaiting, report.tierLists.signalWaitingTotal]].map(([label, stocks, total]) => <Stack key={label} gap={1}>
             <Typography variant="h6">{label} {total}종목 · 표시 {stocks.length}종목</Typography>
             <Typography variant="caption">점수 내림차순·거래대금·종목 코드 순으로 표시합니다. 매수 추천 목록이 아닙니다.</Typography>
             {!stocks.length && <Typography variant="body2">해당 종목 없음</Typography>}
             {stocks.map(stock => <Accordion key={stock.code} disableGutters><AccordionSummary expandIcon={<ExpandMoreIcon />}>{stock.name} ({stock.code}) · {stock.newEntry?.suitability?.tier}등급 · {stock.newEntry?.suitability?.score ?? '미산정'}점</AccordionSummary><AccordionDetails><Stack gap={1}>
+              <Typography variant="body2">{stock.disposition === 'ENTRY_CONDITIONAL' ? '운영 선정' : stock.newEntry?.timing?.status === 'DEFER' ? '자료 확인 필요' : stock.disposition === 'RESEARCH_B' ? 'B등급 비교 대상' : '추가 선정 조건 확인 필요'}</Typography>
               <NewEntrySummary assessment={stock.newEntry} />
               {stock.cautions.map((text, i) => <Typography key={i} variant="body2">{text}</Typography>)}
               <Typography variant="body2">비용 가정 반영 손익비 {format(stock.netRewardRisk)}배</Typography>

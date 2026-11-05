@@ -8,6 +8,15 @@ const report = { status: 'READY', tradeDate: '2026-10-13', forecastDate: '2026-1
   markets: [{ market: 'KOSPI', bias: '중립', dayReturn: 0.2, return20: 2, advancingPercent: 48, aboveEma20Percent: 52, baseScenario: '현재 흐름 유지 확인', upsideScenario: '저항 돌파 시 강화', downsideScenario: '지지 이탈 시 취소', cautions: [] }],
   candidates: [], limitations: ['업종과 공시는 미확인'], assessedStocks: 100, eligibleStocks: 110, version: 'candidate-market-v1' };
 describe('장 마감 보고서', () => {
+  it('유효 신호는 자료 보류와 운영 선정 여부를 함께 표시한다', async () => {
+    const stock = { code: '009470', name: '삼화전기', disposition: 'EXCLUDED', cautions: ['필수 자료 확인 필요'], newEntry: { status: 'DEFER', reasons: ['자료 보완 필요'], suitability: { tier: 'B', score: 77.33, weaknesses: [] }, timing: { status: 'DEFER', reasons: ['자료 보완 필요'], signalWaiting: false } } };
+    api.getDailyReport.mockResolvedValue({ state: 'READY', report: { ...report, tierLists: { comparisonB: [], comparisonBTotal: 0, signalWaiting: [], signalWaitingTotal: 0, activeSignals: [stock], activeSignalsTotal: 1 } } });
+    render(<DailyReportPanel runId="active" onDetail={vi.fn()} />);
+    expect(await screen.findByText('A/B등급 유효 매수 신호 1종목 · 표시 1종목')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('삼화전기 (009470) · B등급 · 77.33점'));
+    expect(screen.getByText('자료 확인 필요')).toBeInTheDocument();
+    expect(screen.getByText('조건부 진입 0종목 · 관찰 0종목')).toBeInTheDocument();
+  });
   beforeEach(() => { vi.resetAllMocks(); api.getDailyReport.mockResolvedValue({ state: 'READY', report, notificationState: 'DISABLED' }); });
   it('shows B comparison and signal waiting separately when operating selections are empty', async () => {
     const stock = { code: '001', name: '비교종목', cautions: ['운영 후보 아님'], newEntry: { status: 'WATCH', suitability: { tier: 'B', score: 75, weaknesses: [] }, timing: { status: 'ELIGIBLE', reasons: [], signalWaiting: false } } };
