@@ -13,15 +13,18 @@ const conditions = { UPSIDE: '상승 시나리오', RANGE: '횡보 시나리오'
 const blocks = { POSITION_UNKNOWN: '보유 상태를 입력해야 매매 의견을 판단할 수 있습니다.', INSUFFICIENT_DATA: '필수 분석 자료가 부족해 판단을 보류했습니다.', HISTORY_REQUIRED: '기간별 분석에 필요한 가격 이력이 없습니다. 종합분석을 다시 실행하세요.', HISTORY_INVALID: '저장 가격 이력이 분석 결과와 일치하지 않습니다. 종합분석을 다시 실행하세요.', HISTORY_INSUFFICIENT: '선택 기간의 계산에 필요한 확정 일봉이 부족합니다.' };
 const format = value => value == null ? '산출 불가' : `${Number(value).toLocaleString('ko-KR')}원`;
 
-export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured, embedded = false, prepareSnapshot, sourceRunId }) {
+export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured, embedded = false, prepareSnapshot, sourceRunId, holdingAnalysis }) {
   const effectiveSnapshot = useRef(snapshotId);
   const [savedSnapshotId, setSavedSnapshotId] = useState(snapshotId);
-  const [position, setPosition] = useState('UNKNOWN');
+  const savedHolding = holdingAnalysis?.availability === 'AVAILABLE' ? holdingAnalysis.holding : null;
+  const [position, setPosition] = useState(savedHolding ? Number(savedHolding.quantity) > 0 ? 'HELD' : 'NOT_HELD' : 'UNKNOWN');
   const [horizon, setHorizon] = useState(10);
   const [horizonMode, setHorizonMode] = useState('AI_PROPOSED');
   const [preferences, setPreferences] = useState(defaultPreferences);
-  const [averageBuyPrice, setAverageBuyPrice] = useState('');
-  const [purchasedOn, setPurchasedOn] = useState('');
+  const [averageBuyPrice, setAverageBuyPrice] = useState(savedHolding?.averageBuyPrice == null ? '' : String(savedHolding.averageBuyPrice));
+  const [quantity, setQuantity] = useState(savedHolding?.quantity > 0 ? String(savedHolding.quantity) : '');
+  const [balanceDate, setBalanceDate] = useState(savedHolding?.balanceDate || '');
+  const [purchasedOn, setPurchasedOn] = useState(savedHolding?.purchasedOn || '');
   const [preview, setPreview] = useState({});
   const [previewRetry, setPreviewRetry] = useState(0);
   const [job, setJob] = useState(null);
@@ -35,9 +38,12 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
   const pendingRequest = useRef(null);
   const requestBody = { positionStatus: position, horizonTradingDays: horizonMode === 'AI_PROPOSED' ? null : Number(horizon), preferences,
     ...(position === 'HELD' && averageBuyPrice !== '' ? { averageBuyPrice: Number(averageBuyPrice) } : {}),
+    ...(position === 'HELD' && quantity !== '' ? { quantity: Number(quantity) } : {}),
+    ...(position === 'HELD' && balanceDate ? { balanceDate } : {}),
     ...(position === 'HELD' && purchasedOn ? { purchasedOn } : {}) };
   const contextKey = JSON.stringify(requestBody);
   const validInput = (horizonMode === 'AI_PROPOSED' || Number.isInteger(Number(horizon)) && Number(horizon) >= 1 && Number(horizon) <= 252) && preferencesValid(preferences)
+    && (position !== 'HELD' || quantity === '' || (Number.isSafeInteger(Number(quantity)) && Number(quantity) > 0 && Number(quantity) <= 9999999999 && Number(averageBuyPrice) > 0))
     && (position !== 'HELD' || averageBuyPrice === '' || (Number(averageBuyPrice) > 0 && /^\d+(\.\d{1,2})?$/.test(averageBuyPrice)));
   useEffect(() => {
     if (!validInput || (!sourceRunId && !savedSnapshotId)) return;
@@ -55,6 +61,7 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
   }, [contextKey, validInput, savedSnapshotId, stockCode, sourceRunId, previewRetry]);
   const previewPolicy = preview.key === contextKey ? preview.data : null;
   const restoreContext = context => {
+    setQuantity(context.quantity == null ? '' : String(context.quantity)); setBalanceDate(context.balanceDate || '');
     setPosition(context.positionStatus); setHorizonMode(context.horizonTradingDays == null ? 'AI_PROPOSED' : 'FIXED'); setHorizon(context.horizonTradingDays ?? 10);
     setPreferences(normalizePreferences(context.preferences));setAverageBuyPrice(context.averageBuyPrice == null ? '' : String(context.averageBuyPrice));setPurchasedOn(context.purchasedOn || '');
   };
@@ -84,7 +91,8 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
     restored.then(j => {
       if (j && !c.signal.aborted) {
         const context = j.context || j.result?.context;
-        if (context) restoreContext(context);
+        if (!context?.positionStatus) return;
+        restoreContext(context);
         return track(j, c.signal);
       }
     })
@@ -105,7 +113,8 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
       if (mode === 'open') {
         initial = await api.getDecision(id, c.signal);
         const context = initial.context || initial.result?.context;
-        if (context && !c.signal.aborted) restoreContext(context);
+        if (!context?.positionStatus) throw new Error('뉴스·업황 리포트입니다. 뉴스 영역의 이력에서 확인하세요.');
+        if (!c.signal.aborted) restoreContext(context);
       }
       else {
         if (!effectiveSnapshot.current) {
@@ -136,6 +145,7 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
   return <SectionCard title="AI 매매 판단" caption="AI가 저장 자료를 독립적으로 해석하고 엔진과 다른 판단·가격 전략을 제안할 수 있습니다. 같은 입력은 저장 결과를 재사용합니다.">
     <Stack gap={2}>
       {!aiConfigured && <Alert severity="info">AI 모델 또는 API 키가 아직 설정되지 않았습니다. 저장된 분석과 판단 이력은 조회할 수 있습니다.</Alert>}
+      {holdingAnalysis && <Alert severity="info">분석에 고정된 보유정보를 기본으로 사용합니다. 아래 수정은 이번 AI 분석에만 적용되며 저장 잔고를 바꾸지 않습니다.</Alert>}
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField select label="보유 상태" value={position} onChange={e => setPosition(e.target.value)} disabled={busy} sx={{ minWidth: 180 }}>
           <MenuItem value="UNKNOWN">선택하지 않음</MenuItem><MenuItem value="NOT_HELD">미보유</MenuItem><MenuItem value="HELD">보유 중</MenuItem>
@@ -147,6 +157,8 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
       <DecisionPreferencesForm value={preferences} onChange={setPreferences} disabled={busy} />
       {position === 'HELD' && <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField type="number" label="평균 매수가 (선택)" value={averageBuyPrice} onChange={e => setAverageBuyPrice(e.target.value)} disabled={busy} inputProps={{ min: 0.01, step: 0.01 }} />
+        <TextField type="number" label="보유수량 (선택)" value={quantity} onChange={e => setQuantity(e.target.value)} disabled={busy} inputProps={{ min: 1, max: 9999999999, step: 1 }} />
+        <TextField type="date" label="잔고 기준일 (선택)" value={balanceDate} onChange={e => setBalanceDate(e.target.value)} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ max: previewPolicy?.priceDate }} />
         <TextField type="date" label="매수일 (선택)" value={purchasedOn} onChange={e => setPurchasedOn(e.target.value)} disabled={busy} InputLabelProps={{ shrink: true }} inputProps={{ max: previewPolicy?.priceDate }} />
       </Stack>}
       <Typography variant="caption" color="text.secondary">AI가 종목 자체의 적합성을 먼저 분석한 뒤 내 성향을 반영합니다. 새 분석은 두 단계 AI 호출을 사용하며, 입력 변경만으로 AI를 호출하지 않습니다.</Typography>

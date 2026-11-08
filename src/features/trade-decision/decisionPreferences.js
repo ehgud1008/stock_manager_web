@@ -8,5 +8,6 @@ export const normalizePreferences = preferences => ({ ...defaultPreferences, ...
 export const preferencesValid = preferences => ['aggressive', 'balanced', 'conservative'].every(key => Number.isInteger(preferences[key]) && preferences[key] >= 0 && preferences[key] <= 100)
   && preferences.aggressive + preferences.balanced + preferences.conservative === 100;
 export const sameDecisionContext = (a, b) => a?.positionStatus === b.positionStatus && (a?.horizonTradingDays ?? null) === b.horizonTradingDays
+  && Number(a?.quantity || 0) === Number(b.quantity || 0) && (a?.balanceDate || '') === (b.balanceDate || '')
   && Number(a?.averageBuyPrice || 0) === Number(b.averageBuyPrice || 0) && (a?.purchasedOn || '') === (b.purchasedOn || '')
   && Object.keys(defaultPreferences).every(key => normalizePreferences(a?.preferences)[key] === normalizePreferences(b.preferences)[key]);

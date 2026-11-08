@@ -1,3 +1,4 @@
+import HoldingAnalysisPanel from '../holdings/HoldingAnalysisPanel';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Chip, Divider, Grid, LinearProgress, Stack,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from '@mui/material';
@@ -61,6 +62,7 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
       {showAnalysis && <Grid size={{ xs: 6, lg: section === 'all' ? 3 : 4 }}><Metric label="유효 매매 신호" caption={analysis.signalReport.completeness === 'READY' ? '확정·유지 신호' : '패턴 신호 표본 부족'}>{analysis.signalReport.completeness === 'READY' ? `${liveSignals.length}개` : '판정 보류'}</Metric></Grid>}
     </Grid>}
 
+    {showAnalysis && <HoldingAnalysisPanel analysis={data.holdingAnalysis} />}
     {showAnalysis && <TradeJudgmentPanel judgment={data.tradeJudgment} />}
     {showAnalysis && <SignalSummary report={analysis.signalReport} />}
 

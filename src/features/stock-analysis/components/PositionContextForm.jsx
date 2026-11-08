@@ -12,9 +12,10 @@ export default function PositionContextForm({ onChange }) {
     catch (e) { setError(e.message); onChange({ position: null, error: e.message }); }
   };
   return <Stack gap={1.5} sx={{ mb: 2 }}>
-    <Typography variant="subtitle2">선택: 보유 포지션 기준 손절·익절 분석 (계좌 자동 연동 아님)</Typography>
+    <Typography variant="caption">기본값은 내 보유종목에 등록한 잔고입니다. 직접 입력한 조건은 이번 분석에만 적용됩니다.</Typography>
+    <Typography variant="subtitle2">선택: 이번 분석만 보유 조건 직접 입력</Typography>
     <TextField select label="보유 상태" value={draft.scope} onChange={e => update('scope', e.target.value)}>
-      <MenuItem value="UNKNOWN">미확인 · 종목 신호만 분석</MenuItem><MenuItem value="NOT_HELD">미보유</MenuItem><MenuItem value="HELD">보유 · 직접 입력</MenuItem>
+      <MenuItem value="UNKNOWN">저장된 보유정보 사용</MenuItem><MenuItem value="NOT_HELD">미보유</MenuItem><MenuItem value="HELD">보유 · 직접 입력</MenuItem>
     </TextField>
     {draft.scope === 'HELD' && <>
       <Stack direction={{ xs: 'column', md: 'row' }} gap={1}>

@@ -3,6 +3,7 @@ import { dispose, init } from 'klinecharts';
 import PropTypes from 'prop-types';
 import { useEffect, useMemo, useRef } from 'react';
 import { getPricePeriodOption, PRICE_PERIOD } from '../../../constants/priceDataStatuses';
+import { ensureTechniqueOverlayRegistered } from '../indicators/techniqueOverlay';
 import {
   ensureIchimokuIndicatorRegistered,
   ICHIMOKU_COLORS,
@@ -205,10 +206,16 @@ export default function KLineStockChart({
   ichimokuEnabled,
   bollingerEnabled,
   basic = false,
+  techniques = null,
+  zonesEnabled = true,
+  fibonacciEnabled = true,
+  boxEnabled = true,
+  tradeLevelsEnabled = true,
 }) {
   const containerRef = useRef(null);
   const chartData = useMemo(() => toKLineData(candles), [candles]);
-  const analysisLevels = useMemo(() => createAnalysisLevels(analysis), [analysis]);
+  const analysisLevels = useMemo(() => createAnalysisLevels(analysis)
+    .filter((level) => tradeLevelsEnabled || level.key === 'current'), [analysis, tradeLevelsEnabled]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -267,6 +274,28 @@ export default function KLineStockChart({
     });
 
     const lineTimestamp = chartData.at(-1).timestamp;
+    if (!basic && techniques?.status === 'READY') {
+      ensureTechniqueOverlayRegistered();
+      const techniqueLines = [];
+      if (zonesEnabled) techniques.zones.forEach((zone) => {
+        techniqueLines.push({ lower: zone.lower, value: zone.upper, color: '#C491F5', label: `${zone.role} ${formatPrice(zone.lower)}–${formatPrice(zone.upper)}` });
+      });
+      if (boxEnabled && techniques.box) techniqueLines.push(
+        { value: techniques.box.lower, color: '#F0B766', label: `박스 하단 ${formatPrice(techniques.box.lower)}` },
+        { value: techniques.box.upper, color: '#F0B766', label: `박스 상단 ${formatPrice(techniques.box.upper)}` },
+      );
+      if (fibonacciEnabled) techniques.fibonacci.levels.forEach((level) => techniqueLines.push({ value: level.value, color: '#55C9C0', label: `피보나치 ${Number((level.ratio * 100).toFixed(1))}% · ${formatPrice(level.value)}` }));
+      techniqueLines.forEach((level) => chart.createOverlay({
+        name: 'techniqueZone', groupId: 'chart-techniques', lock: true,
+        points: [{ timestamp: lineTimestamp, value: level.value }, { timestamp: lineTimestamp, value: level.lower ?? level.value }],
+        extendData: { color: level.color, label: level.label },
+      }));
+      if (fibonacciEnabled && techniques.fibonacci.status === 'CANDIDATE') chart.createOverlay({
+        name: 'segment', groupId: 'chart-techniques', lock: true,
+        points: [techniques.fibonacci.start, techniques.fibonacci.end].map(({ timestamp, value }) => ({ timestamp, value })),
+        styles: { line: { color: '#55C9C0', size: 2 } },
+      });
+    }
     analysisLevels.forEach((level) => {
       chart.createOverlay({
         name: 'horizontalStraightLine',
@@ -298,16 +327,21 @@ export default function KLineStockChart({
       window.removeEventListener('resize', handleResize);
       dispose(chart);
     };
-  }, [analysisLevels, basic, bollingerEnabled, chartData, ichimokuEnabled, period, stockCode]);
+  }, [analysisLevels, basic, bollingerEnabled, chartData, ichimokuEnabled, period, stockCode, techniques, zonesEnabled, fibonacciEnabled, boxEnabled]);
 
-  const entryLabel = isFiniteNumber(analysis?.entryFrom) && isFiniteNumber(analysis?.entryTo)
+  const entryLabel = tradeLevelsEnabled && isFiniteNumber(analysis?.entryFrom) && isFiniteNumber(analysis?.entryTo)
     ? `진입 ${formatPrice(analysis.entryFrom)}–${formatPrice(analysis.entryTo)}`
     : null;
   const legendLevels = analysisLevels.filter((level) => !level.key.startsWith('entry'));
 
   return (
     <Stack gap={1.25}>
-      {!basic && <Stack
+      {!basic && techniques?.status === 'READY' && ((zonesEnabled && techniques.zones.length > 0) || (boxEnabled && techniques.box) || (fibonacciEnabled && techniques.fibonacci.status === 'CANDIDATE')) && <Stack direction="row" gap={1} flexWrap="wrap" aria-label="자동 기법 범례">
+        {zonesEnabled && techniques.zones.length > 0 && <Typography variant="caption" color="#C491F5">보라: 지지·저항 구간 경계</Typography>}
+        {boxEnabled && techniques.box && <Typography variant="caption" color="#F0B766">주황: 박스권 경계</Typography>}
+        {fibonacciEnabled && techniques.fibonacci.status === 'CANDIDATE' && <Typography variant="caption" color="#55C9C0">청록: 피보나치·기준 파동</Typography>}
+      </Stack>}
+      {!basic && analysisLevels.length > 0 && <Stack
         direction="row"
         gap={0.75}
         flexWrap="wrap"
@@ -404,6 +438,11 @@ KLineStockChart.propTypes = {
   })).isRequired,
   analysis: PropTypes.object,
   basic: PropTypes.bool,
+  techniques: PropTypes.object,
+  zonesEnabled: PropTypes.bool,
+  fibonacciEnabled: PropTypes.bool,
+  boxEnabled: PropTypes.bool,
+  tradeLevelsEnabled: PropTypes.bool,
   ichimokuEnabled: PropTypes.bool.isRequired,
   bollingerEnabled: PropTypes.bool.isRequired,
 };

@@ -1,6 +1,8 @@
 import { Box, Stack, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import PropTypes from 'prop-types';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { analyzeChartTechniques } from '../analysis/chartTechniques';
+import ChartTechniqueSummary from './ChartTechniqueSummary';
 import LoadingState from '../../../components/feedback/LoadingState';
 import {
   getPricePeriodOption,
@@ -18,6 +20,10 @@ export default function StockChartPanel({ stockCode, analysis, refreshKey, basic
   const [period, setPeriod] = useState(PRICE_PERIOD.DAY);
   const [ichimokuEnabled, setIchimokuEnabled] = useState(true);
   const [bollingerEnabled, setBollingerEnabled] = useState(false);
+  const [zonesEnabled, setZonesEnabled] = useState(true);
+  const [fibonacciEnabled, setFibonacciEnabled] = useState(true);
+  const [boxEnabled, setBoxEnabled] = useState(true);
+  const [tradeLevelsEnabled, setTradeLevelsEnabled] = useState(true);
   const periodOption = getPricePeriodOption(period);
   const { status, data, error, reload } = useStockPrices(
     stockCode,
@@ -26,6 +32,7 @@ export default function StockChartPanel({ stockCode, analysis, refreshKey, basic
     refreshKey,
     realData,
   );
+  const techniques = useMemo(() => basic ? null : analyzeChartTechniques(data?.candles, period), [basic, data?.candles, period]);
 
   const renderContent = () => {
     if (status === 'loading') return <LoadingState />;
@@ -73,9 +80,15 @@ export default function StockChartPanel({ stockCode, analysis, refreshKey, basic
           candles={data.candles}
           analysis={basic ? undefined : analysis}
           basic={basic}
+          techniques={techniques}
+          zonesEnabled={zonesEnabled}
+          fibonacciEnabled={fibonacciEnabled}
+          boxEnabled={boxEnabled}
+          tradeLevelsEnabled={tradeLevelsEnabled}
           ichimokuEnabled={!basic && ichimokuEnabled}
           bollingerEnabled={!basic && bollingerEnabled}
         />
+        {!basic && <ChartTechniqueSummary result={techniques} fibonacciEnabled={fibonacciEnabled} />}
         {!basic && <TechnicalIndicatorGuide />}
       </>
     );
@@ -84,6 +97,20 @@ export default function StockChartPanel({ stockCode, analysis, refreshKey, basic
   return (
     <Box>
       <Stack direction="row" justifyContent="flex-end" gap={1} mb={1.5} flexWrap="wrap">
+        {!basic && <>
+          <ToggleButton size="small" value="tradeLevels" selected={tradeLevelsEnabled}
+            aria-label="진입·손절·목표 가격선 표시"
+            onChange={() => setTradeLevelsEnabled((value) => !value)}>진입·손절·목표</ToggleButton>
+          <ToggleButton size="small" value="zones" selected={zonesEnabled}
+            disabled={period !== PRICE_PERIOD.DAY} aria-label="지지·저항 영역 표시"
+            onChange={() => setZonesEnabled((value) => !value)}>지지·저항</ToggleButton>
+          <ToggleButton size="small" value="fibonacci" selected={fibonacciEnabled}
+            disabled={period !== PRICE_PERIOD.DAY} aria-label="피보나치 표시"
+            onChange={() => setFibonacciEnabled((value) => !value)}>피보나치</ToggleButton>
+          <ToggleButton size="small" value="box" selected={boxEnabled}
+            disabled={period !== PRICE_PERIOD.DAY} aria-label="박스권 표시"
+            onChange={() => setBoxEnabled((value) => !value)}>박스권</ToggleButton>
+        </>}
         {!basic && <><ToggleButton
           size="small"
           value="ichimoku"

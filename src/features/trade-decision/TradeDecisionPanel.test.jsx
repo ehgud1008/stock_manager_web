@@ -23,6 +23,16 @@ describe('TradeDecisionPanel', () => {
     api.listDecisions.mockResolvedValue({ items: [], hasMore: false });api.waitForJob.mockImplementation(async j => j);
     api.previewDecisionPlan.mockResolvedValue(null);api.previewSourcePlan.mockResolvedValue(null);
   });
+  it('저장된 잔고를 먼저 채우고 수량과 기준일을 기존 AI 요청에 포함한다', async () => {
+    api.startDecision.mockResolvedValue(result());
+    render(<TradeDecisionPanel snapshotId="snapshot-one" stockCode="005930" aiConfigured holdingAnalysis={{ availability: 'AVAILABLE', holding: { quantity: 100, averageBuyPrice: 105, balanceDate: '2026-10-05' } }} />);
+    expect(screen.getByLabelText('보유 상태')).toHaveTextContent('보유 중');
+    expect(screen.getByLabelText('보유수량 (선택)')).toHaveValue(100);
+    expect(api.startDecision).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'AI 상세 검토' }));
+    await waitFor(() => expect(api.startDecision).toHaveBeenCalledWith('snapshot-one', expect.objectContaining({ positionStatus: 'HELD', quantity: 100, averageBuyPrice: 105, balanceDate: '2026-10-05' }), expect.any(String), expect.any(AbortSignal)));
+    expect(api.startDecision).toHaveBeenCalledTimes(1);
+  });
   it('자동 AI 호출 없이 미설정 안내를 보여준다', async () => {
     render(<TradeDecisionPanel snapshotId="snapshot-one" stockCode="005930" aiConfigured={false} />);
     expect(screen.getByRole('button', { name: 'AI 상세 검토' })).toBeDisabled();

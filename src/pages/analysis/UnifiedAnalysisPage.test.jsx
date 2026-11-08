@@ -86,12 +86,12 @@ describe('시장 전체 종합분석', () => {
     fireEvent.click(screen.getByRole('button', { name: '상세', exact: true }));
     await screen.findByRole('heading', { name: '추세 구조' });
     expect(decisions.getDecisionCapabilities).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('tab', { name: '뉴스·업황' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'AI 판단 · 뉴스' }));
     expect(await screen.findByRole('button', { name: '뉴스·업황 분석' })).toBeEnabled();
-    expect(screen.getByRole('tabpanel', { name: '뉴스·업황' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: 'AI 판단 · 뉴스' })).toBeVisible();
     fireEvent.change(screen.getByLabelText('관련 업종 검색어 (선택)'), { target: { value: '반도체' } });
     fireEvent.click(screen.getByRole('tab', { name: '스테이징' }));
-    fireEvent.click(screen.getByRole('tab', { name: '뉴스·업황' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'AI 판단 · 뉴스' }));
     expect(screen.getByLabelText('관련 업종 검색어 (선택)')).toHaveValue('반도체');
     expect(decisions.findImportedSnapshot).toHaveBeenCalledTimes(1);
     expect(decisions.startSnapshot).not.toHaveBeenCalled();expect(decisions.startDecision).not.toHaveBeenCalled();

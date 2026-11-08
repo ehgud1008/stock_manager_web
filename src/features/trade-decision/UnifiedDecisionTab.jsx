@@ -1,9 +1,10 @@
+import TradeDecisionPanel from './TradeDecisionPanel';
 import { Alert, Button, LinearProgress, Stack, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import * as api from '../../api/tradeDecisionApi';
 import NewsInsightsPanel from './NewsInsightsPanel';
 
-export default function UnifiedDecisionTab({ runId, stockCode, priceDate }) {
+export default function UnifiedDecisionTab({ runId, stockCode, priceDate, holdingAnalysis }) {
   const [state, setState] = useState({ loading: true });
   const [retry, setRetry] = useState(0);
   const sourceSnapshot = useRef(null);
@@ -39,6 +40,7 @@ export default function UnifiedDecisionTab({ runId, stockCode, priceDate }) {
     {state.loading && <LinearProgress aria-label="AI 판단 조회 중" />}
     {state.error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(n => n + 1)}>다시 조회</Button>}>{state.error}</Alert>}
     {state.capabilities && !state.capabilities.enabled && <Alert severity="info">뉴스·업황 인사이트는 서버의 저장 분석 기능을 활성화한 후 사용할 수 있습니다.</Alert>}
+    {state.capabilities?.enabled && <TradeDecisionPanel key={`holding-${runId}:${stockCode}`} embedded stockCode={stockCode} sourceRunId={runId} holdingAnalysis={holdingAnalysis} snapshotId={state.snapshot?.status === 'SUCCEEDED' ? state.snapshot.id : null} prepareSnapshot={prepare} aiConfigured={state.capabilities.aiConfigured} />}
     {state.capabilities?.enabled && <NewsInsightsPanel key={`${runId}:${stockCode}`} embedded stockCode={stockCode}
       snapshotId={state.snapshot?.status === 'SUCCEEDED' ? state.snapshot.id : null}
       prepareSnapshot={prepare} aiConfigured={state.capabilities.aiConfigured} />}

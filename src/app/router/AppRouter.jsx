@@ -1,3 +1,4 @@
+import HoldingsPage from '../../pages/holdings/HoldingsPage';
 import { Route, Routes } from 'react-router-dom';
 import AppLayout from '../../components/layout/AppLayout';
 import StockAnalysisPage from '../../pages/analysis/StockAnalysisPage';
@@ -16,6 +17,7 @@ export default function AppRouter() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
+        <Route path="/holdings" element={<HoldingsPage />} />
         <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
         <Route path={ROUTES.ANALYSIS} element={<StockAnalysisPage />} />
         <Route path={ROUTES.DAILY_REPORTS} element={<DailyReportsPage />} />

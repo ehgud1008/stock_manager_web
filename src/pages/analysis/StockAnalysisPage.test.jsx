@@ -125,7 +125,7 @@ describe('StockAnalysisPage', () => {
     await waitFor(() => expect(analyzeStock).toHaveBeenLastCalledWith('005930', expect.objectContaining({ position: { held: false } })));
     await screen.findByText('72.5');
     fireEvent.click(screen.getByText('테스트 다른 종목'));
-    await screen.findByText('미확인 · 종목 신호만 분석');
+    await screen.findByText('저장된 보유정보 사용');
     fireEvent.click(screen.getByText('테스트 원래 종목'));
     await screen.findByText('72.5');
     fireEvent.click(screen.getByRole('button', { name: '종목분석 실행' }));

@@ -27,6 +27,7 @@ vi.mock('klinecharts', () => ({
   init: vi.fn(() => chartMock),
   dispose: vi.fn(),
   registerIndicator: vi.fn(),
+  registerOverlay: vi.fn(),
 }));
 
 const successData = {
@@ -42,6 +43,80 @@ const successData = {
     { date: '2026-07-24', open: 70500, high: 72000, low: 70200, close: 71500, volume: 1300 },
   ],
 };
+
+describe('자동 차트 기법 표시', () => {
+  beforeEach(() => vi.clearAllMocks());
+  const rangeData = { ...successData, candles: Array.from({ length: 85 }, (_, i) => {
+    const close = 100 + 3 * Math.sin(i * Math.PI / 4);
+    return { date: new Date(Date.UTC(2025, 0, i + 1)).toISOString(), open: close,
+      high: close + 1, low: close - 1, close, volume: 100 };
+  }) };
+  it('판정 근거와 구간을 표시하고 표시 전환 시 제거한다', async () => {
+    getStockPrices.mockResolvedValue({ data: rangeData });
+    render(<StockChartPanel stockCode="005930" />);
+    expect(await screen.findByLabelText('자동 차트 기법 분석')).toHaveTextContent('박스권 내부');
+    expect(chartMock.createOverlay).toHaveBeenCalledWith(expect.objectContaining({ name: 'techniqueZone', groupId: 'chart-techniques' }));
+    chartMock.createOverlay.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '지지·저항 영역 표시' }));
+    expect(dispose).toHaveBeenCalled();
+    expect(chartMock.createOverlay.mock.calls.every(([overlay]) => overlay.extendData?.color === '#F0B766')).toBe(true);
+    expect(screen.queryByText('보라: 지지·저항 구간 경계')).not.toBeInTheDocument();
+    expect(screen.getByText('주황: 박스권 경계')).toBeInTheDocument();
+    chartMock.createOverlay.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '박스권 표시' }));
+    expect(chartMock.createOverlay).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('자동 기법 범례')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '지지·저항 영역 표시' }));
+    expect(chartMock.createOverlay).toHaveBeenCalled();
+  });
+  it('주기를 바꾸면 일봉 판정선을 재사용하지 않는다', async () => {
+    getStockPrices.mockResolvedValue({ data: rangeData });
+    render(<StockChartPanel stockCode="005930" />);
+    await screen.findByLabelText('자동 차트 기법 분석');
+    chartMock.createOverlay.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '주봉 조회' }));
+    expect(await screen.findByText('자동 기법 분석은 일봉에서 제공됩니다.')).toBeInTheDocument();
+    expect(chartMock.createOverlay).not.toHaveBeenCalled();
+    for (const name of ['지지·저항 영역 표시', '피보나치 표시', '박스권 표시']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+    }
+  });
+  it('피보나치 가격선과 기준 파동을 독립적으로 켜고 끈다', async () => {
+    const candles = Array.from({ length: 90 }, (_, i) => {
+      const close = i < 50 ? 110 - i * 0.2 : i < 76 ? 100 + (i - 50) * 2 : 150 - (i - 75) * 1.2;
+      return { date: new Date(Date.UTC(2025, 0, i + 1)).toISOString(), open: close,
+        high: close + 1, low: close - 1, close, volume: 100 };
+    });
+    getStockPrices.mockResolvedValue({ data: { ...successData, candles } });
+    render(<StockChartPanel stockCode="005930" />);
+    await screen.findByLabelText('자동 차트 기법 분석');
+    const hasFib = () => chartMock.createOverlay.mock.calls.some(([o]) => o.extendData?.color === '#55C9C0');
+    expect(hasFib()).toBe(true);
+    chartMock.createOverlay.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '지지·저항 영역 표시' }));
+    expect(hasFib()).toBe(true);
+    expect(chartMock.createOverlay).toHaveBeenCalledWith(expect.objectContaining({ name: 'segment' }));
+    chartMock.createOverlay.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '피보나치 표시' }));
+    expect(hasFib()).toBe(false);
+    expect(chartMock.createOverlay.mock.calls.some(([o]) => o.name === 'segment')).toBe(false);
+    expect(screen.queryByText('청록: 피보나치·기준 파동')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('자동 차트 기법 분석')).toHaveTextContent('피보나치 적용 후보');
+    fireEvent.click(screen.getByRole('button', { name: '피보나치 표시' }));
+    expect(hasFib()).toBe(true);
+    expect(screen.getByRole('button', { name: '지지·저항 영역 표시' })).toHaveAttribute('aria-pressed', 'false');
+  });
+  it('종목 변경 후 데이터가 부족하면 이전 구간을 제거한다', async () => {
+    getStockPrices.mockResolvedValueOnce({ data: rangeData }).mockResolvedValueOnce({ data: successData });
+    const { rerender } = render(<StockChartPanel stockCode="005930" />);
+    await screen.findByLabelText('자동 차트 기법 분석');
+    chartMock.createOverlay.mockClear();
+    rerender(<StockChartPanel stockCode="000660" />);
+    expect(await screen.findByText('일봉 60개 이상이 필요합니다.')).toBeInTheDocument();
+    expect(chartMock.createOverlay).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('자동 기법 범례')).not.toBeInTheDocument();
+  });
+});
 
 describe('StockChartPanel', () => {
   beforeEach(() => {

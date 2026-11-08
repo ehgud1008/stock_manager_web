@@ -1,3 +1,4 @@
+import HoldingAnalysisPanel from '../../features/holdings/HoldingAnalysisPanel';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import { Box, Button, Chip, Grid, Stack, Typography } from '@mui/material';
@@ -120,6 +121,7 @@ function StockAnalysisContent() {
       />
       {mode === ANALYSIS_MODE.SWING && <PositionContextForm onChange={value => setPositionDraft({ stockCode, ...value })} />}
 
+      <HoldingAnalysisPanel analysis={analysis.data?.holdingAnalysis} />
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, lg: 8.4 }}>
           <SectionCard title={`${stockName} · ${stockCode}`} caption="키움 차트 전문과 분석 가격 구간">

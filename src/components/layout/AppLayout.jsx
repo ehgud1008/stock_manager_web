@@ -14,6 +14,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 const drawerWidth = 248;
 const navigation = [
   { label: '대시보드', path: '/', icon: <DashboardOutlinedIcon /> },
+  { label: '내 보유종목', path: '/holdings', icon: <AssessmentOutlinedIcon /> },
   { label: '장 마감 리포트', path: '/daily-reports', icon: <SummarizeOutlinedIcon /> },
   { label: '종합분석', path: '/unified-analysis', icon: <AutoAwesomeOutlinedIcon /> },
   { label: '종목 분석', path: '/analysis/005930', icon: <AssessmentOutlinedIcon /> },

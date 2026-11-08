@@ -22,7 +22,7 @@ export default function SavedUnifiedDetail({ selection, onClose, latest = false 
   return <Dialog open fullWidth maxWidth="lg" onClose={onClose} aria-labelledby="unified-detail-title">
     <DialogTitle id="unified-detail-title">{selection.name} · {latest ? '최신 종합분석' : '종합분석 상세'}</DialogTitle>
     <Tabs value={tab} variant="scrollable" scrollButtons="auto" onChange={(_, value) => { setTab(value); if (value === 'ai') setAiVisited(true); if (contentRef.current) contentRef.current.scrollTop = 0; }} aria-label="종합분석 상세 보기" sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}>
-      {[['stage', '스테이징'], ['analysis', '종목분석'], ['chart', '차트'], ['ai', '뉴스·업황']].filter(([value]) => !latest || value !== 'ai').map(([value, label]) => <Tab key={value} value={value} label={label} id={`unified-detail-${value}-tab`} aria-controls={`unified-detail-${value}-panel`} />)}
+      {[['stage', '스테이징'], ['analysis', '종목분석'], ['chart', '차트'], ['ai', 'AI 판단 · 뉴스']].filter(([value]) => !latest || value !== 'ai').map(([value, label]) => <Tab key={value} value={value} label={label} id={`unified-detail-${value}-tab`} aria-controls={`unified-detail-${value}-panel`} />)}
     </Tabs>
     <DialogContent ref={contentRef} sx={{ minHeight: 300 }}><Stack gap={2.5}>
       <Alert severity="info">{latest ? '조회 시점에 확보 가능한 최신 자료로 다시 분석합니다. 실제 가격 기준일은 결과에 표시됩니다. 성과검증의 선정 당시 기록과 목표·손절 기준은 변경되지 않습니다.' : '선택한 실행에 저장된 분석 결과입니다. 차트 탭을 선택할 때 가격을 별도로 조회하며, 저장된 분석은 다시 실행하지 않습니다.'}</Alert>
@@ -35,7 +35,7 @@ export default function SavedUnifiedDetail({ selection, onClose, latest = false 
         {state.data && tab === value && <UnifiedAnalysisResults data={state.data} saved={!latest} section={value} />}
       </Box>)}
       <Box role="tabpanel" id="unified-detail-ai-panel" aria-labelledby="unified-detail-ai-tab" hidden={tab !== 'ai'}>
-        {!latest && state.data && aiVisited && <UnifiedDecisionTab key={`${selection.runId}:${selection.code}`} runId={selection.runId} stockCode={selection.code} priceDate={state.data.result.priceDate} />}
+        {!latest && state.data && aiVisited && <UnifiedDecisionTab key={`${selection.runId}:${selection.code}`} runId={selection.runId} stockCode={selection.code} priceDate={state.data.result.priceDate} holdingAnalysis={state.data.holdingAnalysis} />}
       </Box>
     </Stack></DialogContent>
     <DialogActions>
