@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Alert, Button, Stack, TextField, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, LinearProgress } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Autocomplete, Button, Stack, TextField, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, LinearProgress } from '@mui/material';
+import useStockMaster from '../../features/stock-search/hooks/useStockMaster';
+import { searchStockMaster } from '../../features/stock-search/services/stockMasterService';
 import { Link } from 'react-router-dom';
 import SectionCard from '../../components/common/SectionCard';
 import { listHoldings, saveHolding } from '../../api/holdingsApi';
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date());
 const blank = () => ({ stockCode: '', stockName: '', quantity: '', averageBuyPrice: '', purchasedOn: '', balanceDate: today(), stopPrice: '', targetPrice: '', expectedRevision: 0 });
 export default function HoldingsPage() {
+  const { stocks, status: masterStatus, error: masterError } = useStockMaster();
+  const [query, setQuery] = useState('');
+  const allowed = useMemo(() => stocks.filter(stock => stock.stockType === 'ST' && /^[0-9]{6}$/.test(stock.stockCode)), [stocks]);
+  const options = useMemo(() => query.trim() ? searchStockMaster(allowed, query) : allowed.slice(0, 30), [allowed, query]);
   const [rows, setRows] = useState([]);
   const [draft, setDraft] = useState(blank);
   const [loading, setLoading] = useState(true);
@@ -19,12 +25,12 @@ export default function HoldingsPage() {
       .catch(e => { if (!c.signal.aborted) setError(e.message); }).finally(() => { if (!c.signal.aborted) setLoading(false); });
     return () => c.abort();
   }, [reload]);
-  const edit = row => { setDraft({ ...row, quantity: String(row.quantity), averageBuyPrice: row.averageBuyPrice ?? '', purchasedOn: row.purchasedOn || '', stopPrice: row.stopPrice ?? '', targetPrice: row.targetPrice ?? '', expectedRevision: row.revision }); setNotice(''); };
+  const edit = row => { setDraft({ ...row, quantity: String(row.quantity), averageBuyPrice: row.averageBuyPrice ?? '', purchasedOn: row.purchasedOn || '', stopPrice: row.stopPrice ?? '', targetPrice: row.targetPrice ?? '', expectedRevision: row.revision }); setQuery(`${row.stockName} ${row.stockCode}`); setNotice(''); };
   const save = async event => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
+    event.preventDefault(); if (!draft.stockCode) return; setBusy(true); setError(''); setNotice('');
     try {
       const body = { stockName: draft.stockName, quantity: Number(draft.quantity), averageBuyPrice: Number(draft.quantity) === 0 ? null : Number(draft.averageBuyPrice),
-        purchasedOn: Number(draft.quantity) === 0 ? null : draft.purchasedOn || null, balanceDate: draft.balanceDate, stopPrice: draft.stopPrice === '' ? null : Number(draft.stopPrice), targetPrice: draft.targetPrice === '' ? null : Number(draft.targetPrice), expectedRevision: draft.expectedRevision };
+        purchasedOn: null, balanceDate: today(), stopPrice: null, targetPrice: null, expectedRevision: draft.expectedRevision };
       const saved = await saveHolding(draft.stockCode, body);
       setRows(previous => [...previous.filter(row => row.stockCode !== saved.stockCode), saved].sort((a, b) => a.stockCode.localeCompare(b.stockCode)));
       edit(saved); setNotice('저장했습니다. 다음 분석 실행부터 반영됩니다.');
@@ -39,17 +45,19 @@ export default function HoldingsPage() {
     <SectionCard title={draft.expectedRevision ? '보유정보 수정' : '보유종목 등록'}>
       <Stack component="form" onSubmit={save} gap={2}>
         <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5}>
-          <TextField label="종목코드" required value={draft.stockCode} disabled={busy || !!draft.expectedRevision} onChange={e => setDraft({ ...draft, stockCode: e.target.value })} inputProps={{ pattern: '[0-9]{6}', maxLength: 6 }} />
-          <TextField label="종목명" required value={draft.stockName} disabled={busy} onChange={e => setDraft({ ...draft, stockName: e.target.value })} inputProps={{ maxLength: 100 }} />
+          <Autocomplete sx={{ width: { xs: '100%', md: 280 }, flexShrink: 0 }} disabled={busy || !!draft.expectedRevision}
+            value={draft.stockCode ? { stockCode: draft.stockCode, stockName: draft.stockName } : null} inputValue={query}
+            onInputChange={(_, value, reason) => { setQuery(value); if (reason === 'input') setDraft(current => ({ ...current, stockCode: '', stockName: '' })); }}
+            onChange={(_, stock) => setDraft(current => ({ ...current, stockCode: stock?.stockCode || '', stockName: stock?.stockName || '' }))}
+            options={options} filterOptions={items => items} loading={masterStatus === 'loading'}
+            isOptionEqualToValue={(a, b) => a.stockCode === b.stockCode} getOptionLabel={stock => `${stock.stockName} ${stock.stockCode}`}
+            noOptionsText={masterStatus === 'error' ? '종목 목록을 불러오지 못했습니다.' : '검색 결과가 없습니다.'}
+            renderInput={params => <TextField {...params} label="종목명 또는 종목코드" required error={masterStatus === 'error'} helperText={masterError?.message} />} />
           <TextField label="보유수량" type="number" required value={draft.quantity} disabled={busy} onChange={e => setDraft({ ...draft, quantity: e.target.value })} inputProps={{ min: 0, max: 9999999999, step: 1 }} />
           <TextField label="평균 매입단가" type="number" required={Number(draft.quantity) > 0} value={draft.averageBuyPrice} disabled={busy || draft.quantity === '0'} onChange={e => setDraft({ ...draft, averageBuyPrice: e.target.value })} inputProps={{ min: 0.01, max: 999999999999.99, step: 0.01 }} />
         </Stack>
-        <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5}>
-          {[['balanceDate', '잔고 기준일', true], ['purchasedOn', '매수일 (선택)', false]].map(([key, label, required]) => <TextField key={key} label={label} type="date" required={required} value={draft[key]} disabled={busy} onChange={e => setDraft({ ...draft, [key]: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} inputProps={{ max: today() }} />)}
-          {[['stopPrice', '개인 손절가 (선택)'], ['targetPrice', '개인 목표가 (선택)']].map(([key, label]) => <TextField key={key} label={label} type="number" value={draft[key]} disabled={busy} onChange={e => setDraft({ ...draft, [key]: e.target.value })} inputProps={{ min: 0.01, step: 0.01 }} />)}
-        </Stack>
-        <Typography variant="caption">잔고 기준일 이후의 분석 가격에만 손익을 계산합니다. 매수일을 모르면 비워두세요. 개인 목표가·손절가가 없으면 분석에서 산출한 참고선을 사용합니다.</Typography>
-        <Stack direction="row" gap={1}><Button type="submit" variant="contained" disabled={busy || loading}>{busy ? '저장 중…' : '저장'}</Button><Button disabled={busy} onClick={() => setDraft(blank())}>새 종목 등록</Button></Stack>
+        <Typography variant="caption">종목·평균 매입단가·수량을 저장하면 분석 시 매도·유지·추가매수 판단에 자동 반영합니다. 가격 기준일은 분석 결과에서 확인하세요.</Typography>
+        <Stack direction="row" gap={1}><Button type="submit" variant="contained" disabled={busy || loading || !draft.stockCode}>{busy ? '저장 중…' : '저장'}</Button><Button disabled={busy} onClick={() => { setDraft(blank()); setQuery(''); }}>새 종목 등록</Button></Stack>
       </Stack>
     </SectionCard>
     <SectionCard title={`등록 잔고 ${rows.length}종목`}>

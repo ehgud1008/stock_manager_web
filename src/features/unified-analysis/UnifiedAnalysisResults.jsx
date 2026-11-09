@@ -63,7 +63,7 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
     </Grid>}
 
     {showAnalysis && <HoldingAnalysisPanel analysis={data.holdingAnalysis} />}
-    {showAnalysis && <TradeJudgmentPanel judgment={data.tradeJudgment} />}
+    {showAnalysis && data.holdingAnalysis?.positionStatus !== 'HELD' && <TradeJudgmentPanel judgment={data.tradeJudgment} />}
     {showAnalysis && <SignalSummary report={analysis.signalReport} />}
 
     {showChart && <SectionCard title="가격 차트" caption={`차트는 조회 시점의 가격 데이터입니다. 진입·목표·손절선은 분석 가격일 ${result.priceDate} 기준이며, 차트를 조회해도 분석 결과는 바뀌지 않습니다.`}>

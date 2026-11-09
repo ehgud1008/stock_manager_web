@@ -1,7 +1,7 @@
 import { Alert, Button, Chip, Stack, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
 const money = n => n == null ? '미산정' : `${Number(n).toLocaleString('ko-KR')}원`;
-const actions = { HOLD: '보유 유지', REVIEW_HOLDING: '보유 재검토', SELL_PRIORITY: '매도 우선 검토', EXIT_TRIGGERED: '청산 조건 확인', TAKE_PROFIT_REVIEW: '익절 검토', DEFER: '판단 보류', WATCH: '관망', AVOID: '신규 매수 회피', BUY_CANDIDATE: '신규 매수 후보', STRONG_BUY_CANDIDATE: '적극 매수 후보' };
+const actions = { ADD_AVERAGING_DOWN: '추가매수 검토 · 물타기', ADD_PYRAMID: '추가매수 검토 · 불타기', ADD_REVIEW: '추가매수 검토', HOLD: '보유 유지', REVIEW_HOLDING: '보유 재검토', SELL_PRIORITY: '매도 우선 검토', EXIT_TRIGGERED: '청산 조건 확인', TAKE_PROFIT_REVIEW: '익절 검토', DEFER: '판단 보류', WATCH: '관망', AVOID: '신규 매수 회피', BUY_CANDIDATE: '신규 매수 후보', STRONG_BUY_CANDIDATE: '적극 매수 후보' };
 export default function HoldingAnalysisPanel({ analysis }) {
   if (!analysis) return null;
   const h = analysis.holding;
@@ -12,6 +12,7 @@ export default function HoldingAnalysisPanel({ analysis }) {
       <Button component={Link} to="/holdings" size="small">보유정보 관리</Button>
     </Stack>
     <Typography variant="body2">{actions[analysis.action] || '판단 보류'} · 분석 가격일 {analysis.priceDate || '미확인'}</Typography>
+    <Typography variant="body2">분석 기준가격 {money(analysis.referencePrice)} · 마지막 확정 종가 기준</Typography>
     {h && <Typography variant="body2">등록 잔고 기준일 {h.balanceDate} · {Number(h.quantity).toLocaleString('ko-KR')}주 · 평균 매입단가 {money(h.averageBuyPrice)}</Typography>}
     {analysis.pnlAmount != null && <>
       <Typography>매입금액 {money(analysis.investedAmount)} · 평가금액 {money(analysis.marketValue)}</Typography>
