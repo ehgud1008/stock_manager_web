@@ -32,7 +32,7 @@ export default function AnalysisResultPanel({ result }) {
 
   return (
     <Stack gap={2.25}>
-      {result.analysisMode === 'SWING' && result.holdingAnalysis?.positionStatus !== 'HELD' && <TradeJudgmentPanel judgment={result.tradeJudgment} />}
+      {result.analysisMode === 'SWING' && result.holdingAnalysis?.positionStatus !== 'HELD' && <TradeJudgmentPanel judgment={result.tradeJudgment} positionStatus={result.holdingAnalysis?.positionStatus} warnings={result.warnings} />}
       {result.signalReport && <SignalSummary report={result.signalReport} />}
       <Box>
         <Stack direction="row" alignItems="flex-end" justifyContent="space-between" gap={1}>

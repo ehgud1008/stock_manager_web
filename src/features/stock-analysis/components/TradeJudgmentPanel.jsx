@@ -9,7 +9,7 @@ const ACTIONS = {
   EXIT_TRIGGERED: ['청산 조건 충족', 'error'], TAKE_PROFIT_REVIEW: ['익절 검토', 'info'], DEFER: ['판단 보류', 'warning'],
 };
 
-export default function TradeJudgmentPanel({ judgment }) {
+export default function TradeJudgmentPanel({ judgment, positionStatus, warnings = [] }) {
   if (!judgment) return <Alert severity="info">이 결과에는 매매판단이 저장되어 있지 않습니다. 새 분석을 실행하면 함께 제공됩니다.</Alert>;
   return <Stack gap={1.5} aria-label="매매판단" sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
     <Box><Typography variant="h6">매매판단</Typography>
@@ -19,7 +19,9 @@ export default function TradeJudgmentPanel({ judgment }) {
         }).format(new Date(judgment.asOf)) : '미확인'} (한국시간)
       </Typography>
     </Box>
-    {[['notHeld', '미보유 시'], ['held', '보유 시']].map(([key, title]) => {
+    {(positionStatus === 'HELD' || judgment.positionScope === 'HELD'
+      ? [['held', '보유 기준']]
+      : [['notHeld', '미보유 기준']]).map(([key, title]) => {
       const decision = judgment[key];
       const [label, color] = ACTIONS[decision?.action] || ['판단 미확인', 'warning'];
       return <Box key={key}>
@@ -29,9 +31,12 @@ export default function TradeJudgmentPanel({ judgment }) {
         {decision?.reviewConditions?.map(condition => <Typography key={condition} variant="body2" color="text.secondary" mt={0.5}>재검토 조건: {condition}</Typography>)}
       </Box>;
     })}
-    <Typography variant="caption" color="text.secondary">보유 정보: {{ HELD: '입력한 보유 기준', NOT_HELD: '미보유로 입력', UNKNOWN: '미확인 · 보유 시 판단은 조건부' }[judgment.positionScope] || '미확인'}</Typography>
+    <Typography variant="caption" color="text.secondary">보유 정보: {{ HELD: '내 보유종목 기준', NOT_HELD: '미보유 기준', UNKNOWN: '미확인 · 신규 진입 기준으로 표시' }[positionStatus || judgment.positionScope] || '미확인 · 신규 진입 기준으로 표시'}</Typography>
+    {warnings.length > 0 && <Box><Typography variant="body2" fontWeight={700}>자료 확인 사항</Typography>
+      {warnings.map(text => <Typography key={text} variant="body2" color="warning.main">{text}</Typography>)}
+    </Box>}
     {judgment.limitations?.map(text => <Typography key={text} variant="caption" color="text.secondary">{text}</Typography>)}
     <Typography variant="caption" color="text.secondary">판단 정책 {judgment.policyVersion}</Typography>
   </Stack>;
 }
-TradeJudgmentPanel.propTypes = { judgment: PropTypes.object };
+TradeJudgmentPanel.propTypes = { judgment: PropTypes.object, positionStatus: PropTypes.string, warnings: PropTypes.arrayOf(PropTypes.string) };
