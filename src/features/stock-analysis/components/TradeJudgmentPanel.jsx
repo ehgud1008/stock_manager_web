@@ -1,6 +1,7 @@
 import { Alert, Box, Chip, Stack, Typography } from '@mui/material';
 import PropTypes from 'prop-types';
 import NewEntrySummary from './NewEntrySummary';
+import { readableWarning } from '../scenarioPresentation';
 
 const ACTIONS = {
   STRONG_BUY_CANDIDATE: ['적극 매수 후보', 'success'], BUY_CANDIDATE: ['매수 후보', 'success'],
@@ -33,7 +34,7 @@ export default function TradeJudgmentPanel({ judgment, positionStatus, warnings 
     })}
     <Typography variant="caption" color="text.secondary">보유 정보: {{ HELD: '내 보유종목 기준', NOT_HELD: '미보유 기준', UNKNOWN: '미확인 · 신규 진입 기준으로 표시' }[positionStatus || judgment.positionScope] || '미확인 · 신규 진입 기준으로 표시'}</Typography>
     {warnings.length > 0 && <Box><Typography variant="body2" fontWeight={700}>자료 확인 사항</Typography>
-      {warnings.map(text => <Typography key={text} variant="body2" color="warning.main">{text}</Typography>)}
+      {warnings.map(text => <Typography key={text} variant="body2" color="warning.main">{readableWarning(text)}</Typography>)}
     </Box>}
     {judgment.limitations?.map(text => <Typography key={text} variant="caption" color="text.secondary">{text}</Typography>)}
     <Typography variant="caption" color="text.secondary">판단 정책 {judgment.policyVersion}</Typography>

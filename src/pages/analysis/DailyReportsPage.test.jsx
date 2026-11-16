@@ -116,7 +116,7 @@ describe('장 마감 리포트 메뉴', () => {
   });
   it('이전 이력 페이지를 열어도 최신 확정 보고서 선택을 유지한다', async () => {
     api.listDailyReports.mockResolvedValueOnce({ ...library, hasMore: true }).mockResolvedValue({ ...library, reports: [], page: 1 });
-    renderPage();await screen.findByText('오늘은 조건을 충족한 종목이 없습니다');fireEvent.click(screen.getByRole('button', { name: '이전 이력' }));
+    renderPage();await screen.findByText('오늘은 조건을 충족한 종목이 없습니다');fireEvent.click(screen.getByRole('button', { name: '보고서 이력·상세 정보' }));fireEvent.click(screen.getByRole('button', { name: '이전 이력' }));
     await waitFor(() => expect(api.listDailyReports).toHaveBeenCalledWith({ page: 1, size: 30 }, expect.any(AbortSignal)));
     expect(screen.getByText('오늘은 조건을 충족한 종목이 없습니다')).toBeInTheDocument();expect(api.getDailyReport).toHaveBeenCalledTimes(1);
   });

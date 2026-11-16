@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Alert, Box, Button, LinearProgress, MenuItem, Stack, Tab, Tabs, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, LinearProgress, MenuItem, Stack, Tab, Tabs, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import * as api from '../../api/unifiedAnalysisApi';
 import DailyReportPanel from '../../features/unified-analysis/DailyReportPanel';
 import ReportPerformancePanel from '../../features/unified-analysis/ReportPerformancePanel';
@@ -51,33 +52,31 @@ export default function DailyReportsPage() {
   const stale = date && library?.expectedTradeDate && date < library.expectedTradeDate;
   const choose = value => { const next = new URLSearchParams(params); if (value) next.set('runId', value); else next.delete('runId'); setParams(next); setSelection(null); };
   const changeTab = value => { const next = new URLSearchParams(params); next.set('tab', value); if (value === 'performance' && id) next.set('runId', id); setParams(next); setSelection(null); };
-  return <Stack gap={2.5}>
+  return <Stack gap={{ xs: 1.5, sm: 2.5 }}>
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2}>
-      <Box><Typography variant="overline" color="primary.main">DAILY MARKET REPORT</Typography><Typography variant="h1">장 마감 리포트</Typography><Typography color="text.secondary" mt={1}>시장 흐름과 선정 근거를 확인하고, 이후 성과를 함께 검증하세요.</Typography></Box>
-      <Button component={Link} to="/unified-analysis" sx={{ alignSelf: 'flex-start' }}>종합분석에서 종목 탐색</Button>
-    </Stack>
-    <Stack direction="row" gap={1} flexWrap="wrap">
-      <Button onClick={() => { setRefresh(n => n + 1); }} disabled={loading}>보고서 새로고침</Button>
-      <Button onClick={() => { choose(library.latestReady.runId); setPage(0); }} disabled={!library?.latestReady}>최신 확정 보고서 보기</Button>
+      <Box><Typography variant="overline" color="primary.main">DAILY MARKET REPORT</Typography><Typography variant="h1" sx={{ fontSize: { xs: '1.8rem', md: '2.5rem' } }}>장 마감 리포트</Typography><Typography color="text.secondary" mt={1}>시장 흐름과 선정 근거를 확인하고, 이후 성과를 함께 검증하세요.</Typography></Box>
+      <Button color="inherit" variant="outlined" component={Link} to="/unified-analysis" sx={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>종합분석에서 종목 탐색</Button>
     </Stack>
     {loading && <LinearProgress aria-label="보고서 목록 조회 중" />}
     {error && <Alert severity="error">보고서 목록을 조회하지 못했습니다. {error}</Alert>}
     {invalidId && <Alert severity="error">보고서 링크의 실행 ID가 올바르지 않습니다.</Alert>}
     {library && !library.enabled && <Alert severity="info">보고서 기능이 비활성화되어 있습니다. 성과 검증·운영 상태는 각 기능 설정에 따라 확인할 수 있습니다.</Alert>}
     {library?.enabled && <>
-      <TextField select label="보고서 날짜·실행 선택" value={id} onChange={e => choose(e.target.value)}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems={{ sm: 'center' }}>
+      <TextField sx={{ flex: 1, minWidth: 0 }} select label="보고서 날짜·실행 선택" value={id} onChange={e => choose(e.target.value)}>
         {!id && <MenuItem value="">저장된 전체 시장 실행 없음</MenuItem>}
         {id && !selected && <MenuItem value={id}>직접 연결된 실행 · {id}</MenuItem>}
         {options.map(item => <MenuItem key={item.runId} value={item.runId}>{label(item)}</MenuItem>)}
       </TextField>
-      <Stack direction="row" alignItems="center" gap={1}>
-        <Button disabled={page === 0 || loading} onClick={() => setPage(n => n - 1)}>최근 이력</Button><Typography variant="caption">이력 {page + 1}페이지 · 최신 확정 보고서는 항상 선택 가능</Typography>
-        <Button disabled={!library.hasMore || loading} onClick={() => setPage(n => n + 1)}>이전 이력</Button>
+    <Stack direction="row" gap={1} sx={{ flexShrink: 0 }}>
+      <Button color="inherit" onClick={() => { setRefresh(n => n + 1); }} disabled={loading}>보고서 새로고침</Button>
+      <Button color="inherit" onClick={() => { choose(library.latestReady.runId); setPage(0); }} disabled={!library?.latestReady}>최신 확정 보고서 보기</Button>
+    </Stack>
       </Stack>
       {!library.latestReady && <Alert severity="info">아직 확정된 전체 시장 보고서가 없습니다. 실행을 선택해 작성 상태를 확인할 수 있습니다.</Alert>}
       {stale && <Alert severity="warning">현재 표시 기준일은 {date}입니다. 최근 예정 거래일 {library.expectedTradeDate}의 보고서가 아니므로 오늘 결과로 해석하지 마세요.</Alert>}
       {library.newestRun && library.newestRun.runId !== id && <Alert severity="info" action={<Button color="inherit" onClick={() => choose(library.newestRun.runId)}>해당 실행 보기</Button>}>가장 최근 전체 시장 실행: {label(library.newestRun)}</Alert>}
-      {id && <Typography variant="caption">선택한 실행 {id}{date ? ` · 기준일 ${date}` : ''} · {requested ? '지정한 보고서를 유지합니다.' : '최신 확정 보고서를 자동으로 표시합니다.'}</Typography>}
+
     </>}
     <Tabs value={tab} onChange={(_, value) => changeTab(value)} variant="scrollable" scrollButtons="auto" aria-label="장 마감 리포트 메뉴">
       {tabOptions.map(([value, title]) => <Tab key={value} value={value} label={title} id={`daily-${value}-tab`} aria-controls={`daily-${value}-panel`} />)}
@@ -99,6 +98,16 @@ export default function DailyReportsPage() {
       </Stack>}
       {tab === value && value === 'operations' && <SectionCard title="자동 분석 · 알림 운영 확인"><OperationsWorkspace reportId={id && ready ? id : null} /></SectionCard>}
     </Box>)}
+    {library?.enabled && <Accordion disableGutters elevation={0} sx={{ bgcolor: 'transparent', border: '1px solid', borderColor: 'divider', borderRadius: '12px !important', '&:before': { display: 'none' } }}>
+      <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography variant="body2">보고서 이력·상세 정보</Typography></AccordionSummary>
+      <AccordionDetails><Stack gap={1.5}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ '& button': { whiteSpace: 'nowrap', flexShrink: 0 } }}>
+        <Button disabled={page === 0 || loading} onClick={() => setPage(n => n - 1)}>최근 이력</Button><Typography variant="caption">{page + 1}페이지</Typography>
+        <Button disabled={!library.hasMore || loading} onClick={() => setPage(n => n + 1)}>이전 이력</Button>
+      </Stack>
+      {id && <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>선택한 실행 {id}{date ? ` · 기준일 ${date}` : ''} · {requested ? '지정한 보고서를 유지합니다.' : '최신 확정 보고서를 자동으로 표시합니다.'}</Typography>}
+      </Stack></AccordionDetails>
+    </Accordion>}
     {selection && <SavedUnifiedDetail key={`${selection.runId}:${selection.code}`} selection={selection} latest={tab === 'performance'} onClose={() => setSelection(null)} />}
   </Stack>;
 }

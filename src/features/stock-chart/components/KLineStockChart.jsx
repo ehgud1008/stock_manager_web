@@ -2,6 +2,7 @@ import { Box, Chip, Stack, Typography } from '@mui/material';
 import { dispose, init } from 'klinecharts';
 import PropTypes from 'prop-types';
 import { useEffect, useMemo, useRef } from 'react';
+import { targetLineLabel } from '../../stock-analysis/scenarioPresentation';
 import { getPricePeriodOption, PRICE_PERIOD } from '../../../constants/priceDataStatuses';
 import { ensureTechniqueOverlayRegistered } from '../indicators/techniqueOverlay';
 import {
@@ -87,7 +88,7 @@ const createAnalysisLevels = (analysis) => [
   },
   ...(analysis?.targets || []).map((value, index) => isFiniteNumber(value) && ({
     key: `target-${index}`,
-    label: `목표 ${index + 1}`,
+    label: targetLineLabel(analysis, index),
     value: Number(value),
     color: ANALYSIS_LINE_COLORS.target,
   })),

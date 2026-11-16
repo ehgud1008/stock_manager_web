@@ -8,6 +8,9 @@ import TradeSignalPanel from '../stock-analysis/components/TradeSignalPanel';
 import SignalSummary from '../stock-analysis/components/SignalSummary';
 import TradeJudgmentPanel from '../stock-analysis/components/TradeJudgmentPanel';
 import StockChartPanel from '../stock-chart/components/StockChartPanel';
+import TargetBasisNotice from '../stock-analysis/components/TargetBasisNotice';
+import ScoreContinuityPanel from './ScoreContinuityPanel';
+import { readableWarning, scenarioForDisplay, targetPriceLabel } from '../stock-analysis/scenarioPresentation';
 import { GAP_LABELS, signed, STAGES } from '../screener/screenerModel';
 
 const number = (value, digits = 1) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits });
@@ -32,14 +35,14 @@ function Row({ label, value }) {
   </Stack>;
 }
 
-export default function UnifiedAnalysisResults({ data, saved = false, section = 'all' }) {
+export default function UnifiedAnalysisResults({ data, saved = false, section = 'all', continuity = null }) {
   const showStage = section === 'all' || section === 'stage';
   const showAnalysis = section === 'all' || section === 'analysis';
   const showChart = section === 'all' || section === 'chart';
   const { result, collectionWarnings, collectionQuality } = data;
   const { stock, analysis, screener } = result;
   const stage = STAGES.find(item => item.id === screener.stage);
-  const scenario = analysis.scenario;
+  const scenario = scenarioForDisplay(analysis.scenario, analysis.warnings);
   const liveSignals = analysis.signalReport.signals.filter(signal => ['CONFIRMED', 'ACTIVE'].includes(signal.state));
   const factors = analysis.factors.map(factor => ({ ...factor, contribution: factor.score == null ? null : factor.score * factor.weight }));
   const rewardRisk = scenario && scenario.entryTo > scenario.stopLoss && scenario.targets?.length
@@ -65,6 +68,7 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
     {showAnalysis && <HoldingAnalysisPanel analysis={data.holdingAnalysis} />}
     {showAnalysis && data.holdingAnalysis?.positionStatus !== 'HELD' && <TradeJudgmentPanel judgment={data.tradeJudgment} positionStatus={data.holdingAnalysis?.positionStatus} warnings={data.collectionWarnings} />}
     {showAnalysis && <SignalSummary report={analysis.signalReport} />}
+    {showAnalysis && saved && <ScoreContinuityPanel data={data} continuity={continuity} />}
 
     {showChart && <SectionCard title="가격 차트" caption={`차트는 조회 시점의 가격 데이터입니다. 진입·목표·손절선은 분석 가격일 ${result.priceDate} 기준이며, 차트를 조회해도 분석 결과는 바뀌지 않습니다.`}>
       <StockChartPanel
@@ -110,16 +114,18 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
       </SectionCard></Grid>}
       {showAnalysis && <Grid size={{ xs: 12, lg: section === 'all' ? 5 : 12 }}><SectionCard title="종목 평가와 가격 구간" caption="같은 종가로 계산한 전략과 시나리오">
         <Stack gap={2}>
+          <Typography variant="caption" color="text.secondary">점수 기준 종목 평가 · 신규 진입 자격과 최종 보고서 선정은 별도입니다.</Typography>
           <Typography variant="h2">{analysis.strategy.strategyName}</Typography>
           {analysis.totalScore != null ? <LinearProgress variant="determinate" value={analysis.totalScore} sx={{ height: 6, borderRadius: 4 }} />
             : <Alert severity="info">표본 또는 가격 시나리오가 충분하지 않아 대표점수를 산출하지 않았습니다.</Alert>}
           {(analysis.strategy.reasons || []).map((reason, index) => <Typography key={index} variant="body2" color="text.secondary">{reason}</Typography>)}
           <Divider />
           <Row label="진입 구간" value={scenario ? `${price(scenario.entryFrom)} ~ ${price(scenario.entryTo)}` : '유효 시나리오 없음'} />
-          <Row label="목표가" value={scenario?.targets?.length ? scenario.targets.map(price).join(' / ') : '산출 불가'} />
+          <Row label={targetPriceLabel(scenario)} value={scenario?.targets?.length ? scenario.targets.map(price).join(' / ') : '산출 불가'} />
+          <TargetBasisNotice scenario={scenario} />
           <Row label="시나리오 손절가" value={price(scenario?.stopLoss)} />
           <Row label="첫 목표 손익비" value={rewardRisk == null ? '산출 불가' : `${number(rewardRisk, 2)}배`} />
-          <Typography variant="caption" color="text.secondary">손익비는 진입 상단 기준입니다. 개인 보유 정보는 반영하지 않습니다.</Typography>
+          <Typography variant="caption" color="text.secondary">손익비는 비용 차감 전·분석 시나리오 진입 상단 기준입니다. 공통 진입 판단의 교집합 구간 및 보고서의 비용 차감 후 손익비와 구분합니다.</Typography>
           <Divider />
           <Row label="직전 20봉 대비 거래량" value={screener.features?.volumeRatio20 == null ? '산출 불가' : `${number(screener.features.volumeRatio20, 2)}배`} />
           <Row label="직전 20봉 고가 돌파" value={screener.features?.breakout20 == null ? '판정 보류' : screener.features.breakout20 ? '돌파' : '미돌파'} />
@@ -139,7 +145,7 @@ export default function UnifiedAnalysisResults({ data, saved = false, section = 
           <Typography variant="body2">사용 표본: 일봉 {result.dailyBarCount}개 · 주봉 {result.weeklyBarCount}개 · 월봉 {result.monthlyBarCount}개</Typography>
           <Typography variant="body2" color="text.secondary">첫 주·월은 제외하며 마지막 주·월은 가격일까지 반영합니다. {saved ? '선택한 실행에 저장된 결과입니다.' : '이 결과는 현재 화면에서만 유지됩니다.'}</Typography>
           {collectionWarnings.map((message, index) => <Typography key={`collection-${index}`} variant="body2">수집 · {message}</Typography>)}
-          {result.warnings.filter(w => w.source !== 'SIGNAL').map((warning, index) => <Typography key={index} variant="body2">{SOURCE[warning.source] || '확인 사항'} · {WARNINGS[warning.message] || warning.message}</Typography>)}
+          {result.warnings.filter(w => w.source !== 'SIGNAL').map((warning, index) => <Typography key={index} variant="body2">{SOURCE[warning.source] || '확인 사항'} · {WARNINGS[warning.message] || readableWarning(warning.message)}</Typography>)}
           <Typography variant="caption" color="text.secondary">{result.engineVersion} · {analysis.engineVersion} · {screener.engineVersion}</Typography>
         </Stack></AccordionDetails></Accordion>
     </Box>

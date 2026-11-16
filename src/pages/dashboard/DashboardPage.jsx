@@ -1,68 +1,50 @@
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
-import BookmarkBorderRoundedIcon from '@mui/icons-material/BookmarkBorderRounded';
-import { Box, Button, Chip, Divider, Grid, Stack, Typography } from '@mui/material';
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import { Alert, Box, Button, Chip, Grid, LinearProgress, Stack, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import PageHeader from '../../components/common/PageHeader';
+import * as api from '../../api/unifiedAnalysisApi';
 import SectionCard from '../../components/common/SectionCard';
-import { getAnalysisRoute } from '../../constants/routes';
-import ServerStatusCard from '../../features/server-status/components/ServerStatusCard';
 import StockSearchPanel from '../../features/stock-search/components/StockSearchPanel';
-import { screenerMockData } from '../../mocks/screenerMockData';
-import { recentAnalysisMock, watchlistMock } from '../../mocks/stockMockData';
+
+const destinations = [
+  { title: '시장 전체에서 종목 찾기', description: '저장된 분석을 점수·추세·매매 조건으로 검색합니다.', path: '/unified-analysis', icon: <TuneOutlinedIcon /> },
+  { title: '내 보유종목 확인', description: '보유수량과 평균 매입단가를 관리하고 종목 분석으로 이어갑니다.', path: '/holdings', icon: <AssessmentOutlinedIcon /> },
+];
 
 export default function DashboardPage() {
-  return (
-    <>
-      <PageHeader eyebrow="DASHBOARD / 01" title="오늘의 시장을 한눈에" description="종목 탐색에서 분석 결과 확인까지 이어지는 국내 주식 리서치 워크스페이스입니다." />
-      <StockSearchPanel />
-
-      <Grid container spacing={2.5} mt={0}>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <SectionCard title="관심 종목" caption="실시간 가격이 아닌 화면 구성용 종목 목록입니다." action={<Button component={Link} to="/screener" endIcon={<ArrowForwardRoundedIcon />} size="small">전체 보기</Button>}>
-            <Grid container spacing={1.5}>
-              {watchlistMock.map((stock, index) => (
-                <Grid size={{ xs: 12, sm: 4 }} key={stock.stockCode}>
-                  <Box component={Link} to={getAnalysisRoute(stock.stockCode)} sx={{ display: 'block', p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2.5, color: 'inherit', textDecoration: 'none', transition: '150ms ease', '&:hover': { borderColor: 'rgba(139,218,99,.4)', transform: 'translateY(-2px)' } }}>
-                    <Stack direction="row" justifyContent="space-between"><Typography variant="caption" color="text.secondary">{stock.marketType}</Typography><Typography variant="caption" color="text.secondary">0{index + 1}</Typography></Stack>
-                    <Typography fontWeight={650} mt={2}>{stock.stockName}</Typography>
-                    <Typography variant="caption" color="text.secondary">{stock.stockCode}</Typography>
-                    <Typography variant="body2" color="primary.main" mt={2}>{stock.note}</Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </SectionCard>
-        </Grid>
-        <Grid size={{ xs: 12, lg: 4 }}><ServerStatusCard /></Grid>
-
-        <Grid size={{ xs: 12, lg: 7 }}>
-          <SectionCard title="최신 스크리닝 후보" caption="추천 결과가 아닌 테이블 레이아웃 확인용 샘플입니다." action={<Chip label="MOCK" size="small" variant="outlined" />}>
-            <Stack divider={<Divider flexItem />}>
-              {screenerMockData.map((row) => (
-                <Stack component={Link} to={getAnalysisRoute(row.stockCode)} key={row.stockCode} direction="row" alignItems="center" gap={2} py={1.5} sx={{ color: 'inherit', textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>
-                  <Typography variant="caption" color="text.secondary" width={20}>{String(row.rank).padStart(2, '0')}</Typography>
-                  <Box flex={1}><Typography variant="body2" fontWeight={600}>{row.stockName}</Typography><Typography variant="caption" color="text.secondary">{row.stockCode} · {row.market}</Typography></Box>
-                  <Chip label={row.score} size="small" variant="outlined" />
-                  <ArrowForwardRoundedIcon fontSize="small" />
-                </Stack>
-              ))}
-            </Stack>
-          </SectionCard>
-        </Grid>
-        <Grid size={{ xs: 12, lg: 5 }}>
-          <SectionCard title="최근 분석 이력" caption="최근 열어본 샘플 분석 화면">
-            <Stack divider={<Divider flexItem />}>
-              {recentAnalysisMock.map((item) => (
-                <Stack key={`${item.stockCode}-${item.mode}`} direction="row" alignItems="center" gap={1.5} py={1.5}>
-                  <Box sx={{ width: 34, height: 34, borderRadius: 2, bgcolor: 'rgba(113,167,255,.08)', color: 'secondary.main', display: 'grid', placeItems: 'center' }}><BookmarkBorderRoundedIcon fontSize="small" /></Box>
-                  <Box flex={1}><Typography variant="body2" fontWeight={600}>{item.stockName}</Typography><Typography variant="caption" color="text.secondary">{item.stockCode} · {item.mode}</Typography></Box>
-                  <Typography variant="caption" color="warning.main">{item.status}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </SectionCard>
-        </Grid>
-      </Grid>
-    </>
-  );
+  const [report, setReport] = useState({ loading: true });
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setReport({ loading: true });
+    api.listDailyReports({ page: 0, size: 1 }, controller.signal)
+      .then(data => { if (!controller.signal.aborted) setReport({ data }); })
+      .catch(error => { if (!controller.signal.aborted) setReport({ error: error.message }); });
+    return () => controller.abort();
+  }, [refresh]);
+  const latest = report.data?.latestReady;
+  return <Stack gap={2.5}>
+    <Box><Typography variant="overline" color="primary.main">RESEARCH HOME</Typography><Typography variant="h1" sx={{ fontSize: { xs: '1.8rem', md: '2.5rem' }, mt: 0.5 }}>오늘의 시장을 한눈에</Typography><Typography color="text.secondary" mt={1}>시장 흐름을 확인하고, 관심 있는 종목의 분석으로 이어가세요.</Typography></Box>
+    <SectionCard title="최신 장 마감 리포트" caption="확정된 보고서에서 시장 판단과 선정 종목을 확인하세요." action={<SummarizeOutlinedIcon color="primary" />} sx={{ borderColor: 'rgba(139,218,99,.3)' }}>
+      <Stack gap={2}>
+        {report.loading && <LinearProgress aria-label="최신 보고서 확인 중" />}
+        {report.error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRefresh(value => value + 1)}>다시 조회</Button>}>최신 보고서를 확인하지 못했습니다. {report.error}</Alert>}
+        {latest && <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap"><Typography sx={{ fontSize: 28, fontWeight: 650 }}>{latest.tradeDate}</Typography><Chip label="최신 확정 보고서" variant="outlined" size="small" /></Stack>}
+        {!report.loading && !report.error && !latest && <Typography color="text.secondary">{report.data?.enabled === false ? '보고서 기능이 비활성화되어 있습니다.' : '아직 확정된 보고서가 없습니다. 리포트 화면에서 작성 상태를 확인하세요.'}</Typography>}
+        {latest && report.data?.expectedTradeDate && latest.tradeDate < report.data.expectedTradeDate && <Typography variant="body2" color="warning.main">최근 예정 거래일 {report.data.expectedTradeDate}의 보고서는 아직 준비되지 않았습니다.</Typography>}
+        <Button component={Link} to={latest ? `/daily-reports?runId=${encodeURIComponent(latest.runId)}` : '/daily-reports'} variant="contained" endIcon={<ArrowForwardRoundedIcon />} sx={{ alignSelf: 'flex-start' }}>{latest ? '시장·선정 종목 보기' : '장 마감 리포트 열기'}</Button>
+      </Stack>
+    </SectionCard>
+    <Grid container spacing={2}>
+      {destinations.map(item => <Grid key={item.path} size={{ xs: 12, sm: 6 }}>
+        <Box component={Link} to={item.path} sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, height: '100%', p: 2.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', color: 'text.primary', textDecoration: 'none', '&:hover': { borderColor: 'primary.main' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 3 } }}>
+          <Box sx={{ color: 'text.secondary', pt: 0.25 }}>{item.icon}</Box><Box flex={1}><Typography fontWeight={650}>{item.title}</Typography><Typography variant="body2" color="text.secondary" mt={0.75}>{item.description}</Typography></Box><ArrowForwardRoundedIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+        </Box>
+      </Grid>)}
+    </Grid>
+    <StockSearchPanel />
+  </Stack>;
 }

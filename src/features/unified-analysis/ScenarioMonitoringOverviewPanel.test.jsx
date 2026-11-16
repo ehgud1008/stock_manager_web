@@ -11,6 +11,16 @@ const data = { from: '2026-10-01', to: '2026-10-22', page: 0, size: 20, totalEle
 
 describe('전체 선정 이력 추적', () => {
   beforeEach(() => { vi.resetAllMocks(); api.listScenarioMonitoring.mockResolvedValue(data); });
+  it('B등급 비교 후보를 구분하고 B등급 필터를 서버에 전달한다', async () => {
+    api.listScenarioMonitoring.mockResolvedValue({ ...data, totalElements: 1, rows: [{ ...row, stock: { ...stock, disposition: 'RESEARCH_B' } }] });
+    render(<ScenarioMonitoringOverviewPanel />);
+    const table = await screen.findByRole('table', { name: '전체 선정 종목 시나리오 추적' });
+    expect(table).toHaveTextContent('B등급 비교 후보');
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.click(await screen.findByRole('option', { name: 'B등급 비교 후보' }));
+    fireEvent.click(screen.getByRole('button', { name: '조회', exact: true }));
+    await waitFor(() => expect(api.listScenarioMonitoring).toHaveBeenLastCalledWith(expect.objectContaining({ disposition: 'RESEARCH_B', page: 0 }), expect.any(AbortSignal)));
+  });
   it('여러 선정일과 같은 종목의 서로 다른 목표를 함께 표시하고 원래 실행의 상세로 연결한다', async () => {
     const onDetail = vi.fn(); const onReport = vi.fn(); render(<ScenarioMonitoringOverviewPanel onDetail={onDetail} onReport={onReport} />);
     const table = await screen.findByRole('table', { name: '전체 선정 종목 시나리오 추적' });

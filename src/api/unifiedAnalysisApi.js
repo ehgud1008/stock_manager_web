@@ -11,6 +11,7 @@ export const resumeUnifiedRun = id => httpClient.post(`${runsPath}/${id}/resume`
 export const recoverUnifiedRun = id => httpClient.post(`${runsPath}/${id}/recover`).then(unwrap);
 export const getUnifiedItems = (id, params, signal) => httpClient.get(`${runsPath}/${id}/items`, { params, signal }).then(unwrap);
 export const getUnifiedDetail = (id, code, signal) => httpClient.get(`${runsPath}/${id}/items/${code}`, { signal }).then(unwrap);
+export const getUnifiedScoreHistory = (id, code, signal) => httpClient.get(`${runsPath}/${id}/items/${code}/score-history`, { signal }).then(unwrap);
 export const listDailyReports = (params, signal) => httpClient.get('/v1/unified-analysis/reports', { params, signal }).then(unwrap);
 export const getDailyReport = (id, signal) => httpClient.get(`${runsPath}/${id}/report`, { signal }).then(unwrap);
 export const requestDailyReport = id => httpClient.post(`${runsPath}/${id}/report`).then(unwrap);

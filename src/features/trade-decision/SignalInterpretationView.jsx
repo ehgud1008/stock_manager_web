@@ -1,4 +1,6 @@
 import { Alert, Box, Chip, Link, Stack, Typography } from '@mui/material';
+import TargetBasisNotice from '../stock-analysis/components/TargetBasisNotice';
+import { scenarioForDisplay, targetPriceLabel } from '../stock-analysis/scenarioPresentation';
 
 const stances = { SUPPORTED: '엔진 신호 뒷받침', CHECK_REQUIRED: '추가 확인 필요', RECONSIDER: '엔진 신호 재검토 필요', INSUFFICIENT: '자료 부족 · 해석 유보' };
 const actions = { BUY_CANDIDATE: '매수 후보', WATCH: '관찰', WAIT: '대기', AVOID: '진입 회피' };
@@ -28,7 +30,7 @@ export default function SignalInterpretationView({ result }) {
   const sources = result.evidence?.sources || [];
   const analysis = result.engine?.evidence?.ANALYSIS;
   const timing = result.signalContext;
-  const scenario = analysis?.scenario;
+  const scenario = scenarioForDisplay(analysis?.scenario, analysis?.warnings);
   return <Stack gap={1.5} component="section" aria-label="매매 신호 종합 해석" sx={{ p: 2, border: 1, borderColor: 'primary.main', borderRadius: 2 }}>
     <Typography variant="h6">매매 신호 종합 해석</Typography>
     <Stack direction="row" gap={1} flexWrap="wrap"><Chip label={`엔진 전략: ${actions[analysis?.strategy?.action] || '미확인'}`} variant="outlined" /><Chip label={stances[interpretation.stance] || '해석 유보'} color={interpretation.stance === 'RECONSIDER' ? 'warning' : 'default'} /></Stack>
@@ -40,7 +42,7 @@ export default function SignalInterpretationView({ result }) {
       <Typography fontWeight={600}>자료 시점·가격 참고</Typography>
       <Typography variant="body2">엔진 가격 기준일 {result.engine?.priceDate || '미확인'} · 수집 시점 {timing?.collectedAt || result.evidence?.collectedAt || '미확인'}</Typography>
       {timing?.status === 'WITHIN_WINDOW' ? <Typography variant="caption">기준일 차이 {timing.calendarDayGap}일(달력 기준). 최신 거래일 또는 현재 가격 확인을 뜻하지 않습니다.</Typography> : <Alert severity="warning" sx={{ mt: 1 }}>엔진 기준일이 오래되었거나 시점 확인이 필요합니다. 최신 종목분석 후 해석을 다시 확인하세요.</Alert>}
-      {scenario ? <><Typography variant="body2" mt={1}>저장된 엔진 진입 구간: {money(scenario.entryFrom)} ~ {money(scenario.entryTo)}</Typography><Typography variant="body2">목표가: {(scenario.targets || []).map(money).join(' / ') || '미산출'} · 손절가: {money(scenario.stopLoss)}</Typography><Typography variant="caption">저장된 엔진 기준 가격입니다. 현재 적용 여부는 신호 상태와 아래 조건을 함께 확인하세요.</Typography></> : <Typography variant="body2" mt={1}>저장된 엔진 가격 계획이 없어 가격을 표시하지 않습니다.</Typography>}
+      {scenario ? <><Typography variant="body2" mt={1}>저장된 엔진 진입 구간: {money(scenario.entryFrom)} ~ {money(scenario.entryTo)}</Typography><Typography variant="body2">{targetPriceLabel(scenario)}: {(scenario.targets || []).map(money).join(' / ') || '미산출'} · 손절가: {money(scenario.stopLoss)}</Typography><TargetBasisNotice scenario={scenario} /><Typography variant="caption">저장된 엔진 기준 가격입니다. 현재 적용 여부는 신호 상태와 아래 조건을 함께 확인하세요.</Typography></> : <Typography variant="body2" mt={1}>저장된 엔진 가격 계획이 없어 가격을 표시하지 않습니다.</Typography>}
     </Box>
     <Conditions title="엔진과 외부 근거의 충돌" rows={interpretation.conflicts} sources={sources} />
     {!interpretation.conflicts?.length && <Typography variant="body2" color="text.secondary">이번 리포트에서 명시한 충돌은 없습니다. 반대 근거가 없다는 뜻은 아닙니다.</Typography>}

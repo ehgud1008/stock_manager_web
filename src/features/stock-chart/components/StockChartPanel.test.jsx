@@ -45,6 +45,15 @@ const successData = {
 };
 
 describe('자동 차트 기법 표시', () => {
+  it('preserves projected basis in chart labels and removes it with trade levels', async () => {
+    getStockPrices.mockResolvedValue({ data: successData });
+    render(<StockChartPanel stockCode="005930" analysis={{ entryFrom: 70000, entryTo: 71000, targets: [74000], stopLoss: 68000, targetBasis: 'STRUCTURAL_RISK_MULTIPLE' }} />);
+    expect(await screen.findByText('가정 목표 1 74,000')).toBeInTheDocument();
+    expect(screen.getByText('신고가 가정 목표 · 2R / 3.5R')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '진입·손절·목표 가격선 표시' }));
+    expect(screen.queryByText('가정 목표 1 74,000')).not.toBeInTheDocument();
+    expect(screen.queryByText('신고가 가정 목표 · 2R / 3.5R')).not.toBeInTheDocument();
+  });
   beforeEach(() => vi.clearAllMocks());
   const rangeData = { ...successData, candles: Array.from({ length: 85 }, (_, i) => {
     const close = 100 + 3 * Math.sin(i * Math.PI / 4);

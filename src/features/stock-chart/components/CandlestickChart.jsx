@@ -1,5 +1,6 @@
 import { Box, Stack, Typography } from '@mui/material';
 import PropTypes from 'prop-types';
+import { targetLineLabel } from '../../stock-analysis/scenarioPresentation';
 
 export default function CandlestickChart({ candles, analysis }) {
   const analysisLevels = [
@@ -16,7 +17,7 @@ export default function CandlestickChart({ candles, analysis }) {
   const lineLevels = [
     { key: 'current', label: '현재가', value: analysis?.currentPrice, color: 'rgba(255,255,255,.65)' },
     { key: 'stop', label: '손절', value: analysis?.stopLoss, color: '#F27878' },
-    ...(analysis?.targets || []).map((value, index) => ({ key: `target-${index}`, label: `목표 ${index + 1}`, value, color: '#66D38A' })),
+    ...(analysis?.targets || []).map((value, index) => ({ key: `target-${index}`, label: targetLineLabel(analysis, index), value, color: '#66D38A' })),
   ].filter((item) => item.value != null && item.value !== '' && Number.isFinite(Number(item.value)));
   const entryTop = analysis?.entryFrom && analysis?.entryTo ? toPosition(Math.max(analysis.entryFrom, analysis.entryTo)) : null;
   const entryBottom = analysis?.entryFrom && analysis?.entryTo ? toPosition(Math.min(analysis.entryFrom, analysis.entryTo)) : null;

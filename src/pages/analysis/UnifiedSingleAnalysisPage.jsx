@@ -1,4 +1,5 @@
 import TradeDecisionPanel from '../../features/trade-decision/TradeDecisionPanel';
+import IntegratedDecisionPanel from '../../features/trade-decision/IntegratedDecisionPanel';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, LinearProgress, Stack, TextField, Typography } from '@mui/material';
@@ -121,6 +122,7 @@ export default function UnifiedSingleAnalysisPage() {
     {state.status === 'error' && <Alert severity="error" action={<Button color="inherit" onClick={execute}>다시 실행</Button>}>{state.message}</Alert>}
     {state.status === 'success' && <>
       <UnifiedAnalysisResults data={state.data} saved={Boolean(state.snapshotId)} />
+      {state.snapshotId && capabilities.integratedContractVersion && <IntegratedDecisionPanel key={`integrated-${state.snapshotId}`} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} />}
       {state.snapshotId && <TradeDecisionPanel key={`holding-${state.snapshotId}`} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} holdingAnalysis={state.data.holdingAnalysis} />}
       {state.snapshotId && <NewsInsightsPanel key={state.snapshotId} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} />}
     </>}

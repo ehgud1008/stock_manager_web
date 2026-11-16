@@ -15,7 +15,7 @@ describe('상세 종목 분석', () => {
     expect(screen.getByRole('status')).toHaveTextContent('종목을 분석');
     expect(screen.getByRole('button', { name: '종목 다시 분석' })).toBeDisabled();
     expect(await screen.findByText('새로 분석한 전략')).toBeInTheDocument();
-    expect(screen.getByText('STRATEGY')).toBeInTheDocument();
+    expect(screen.getByText('점수 기준 종목 평가')).toBeInTheDocument();
     expect(screen.getByText('72.5')).toBeInTheDocument();
     expect(screen.getByText('74,000원')).toBeInTheDocument();
     expect(analyzeStockLive).toHaveBeenCalledWith('005930', {
@@ -26,7 +26,7 @@ describe('상세 종목 분석', () => {
     analyzeStockLive.mockRejectedValueOnce(new Error('수집 실패')).mockResolvedValue(result('재시도 결과'));
     render(<ScreenerStockAnalysis stockCode="005930" mode="SHORT_TERM" />);
     expect(await screen.findByRole('alert')).toHaveTextContent('수집 실패');
-    expect(screen.queryByText('STRATEGY')).not.toBeInTheDocument();
+    expect(screen.queryByText('점수 기준 종목 평가')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '종목 분석 다시 시도' }));
     expect(await screen.findByText('재시도 결과')).toBeInTheDocument();
     expect(analyzeStockLive).toHaveBeenCalledTimes(2);

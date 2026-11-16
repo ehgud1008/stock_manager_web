@@ -6,7 +6,7 @@ import ScenarioMonitoringTable from './ScenarioMonitoringTable';
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 function initialFilters() {
   const to = today();
-  const start = new Date(`${to}T00:00:00Z`); start.setUTCDate(start.getUTCDate() - 90);
+  const start = new Date(`${to}T00:00:00Z`); start.setUTCDate(start.getUTCDate() - 7);
   return { from: start.toISOString().slice(0, 10), to, search: '', disposition: 'ALL' };
 }
 
@@ -54,7 +54,7 @@ export default function ScenarioMonitoringOverviewPanel({ onDetail, onReport }) 
       <TextField label="선정 종료일" type="date" value={filters.to} onChange={change('to')} slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: today() } }} />
       <TextField label="종목명 또는 코드" value={filters.search} onChange={change('search')} slotProps={{ htmlInput: { maxLength: 100 } }} />
       <TextField select label="선정 구분" value={filters.disposition} onChange={change('disposition')} sx={{ minWidth: 150 }}>
-        <MenuItem value="ALL">전체 선정</MenuItem><MenuItem value="ENTRY_CONDITIONAL">조건부 진입</MenuItem><MenuItem value="WATCH">관찰 대상</MenuItem>
+        <MenuItem value="ALL">전체 선정</MenuItem><MenuItem value="ENTRY_CONDITIONAL">조건부 진입</MenuItem><MenuItem value="WATCH">관찰 대상</MenuItem><MenuItem value="RESEARCH_B">B등급 비교 후보</MenuItem>
       </TextField>
       <Button type="submit" variant="contained" disabled={invalid || state.loading}>조회</Button>
       <Button onClick={() => setRefresh(n => n + 1)} disabled={state.loading}>전체 추적 새로고침</Button>

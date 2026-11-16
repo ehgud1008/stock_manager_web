@@ -14,7 +14,7 @@ export default function NewsInsightsPanel({ snapshotId, stockCode, aiConfigured,
   const [history, setHistory] = useState({ items: [], hasMore: false }); const [page, setPage] = useState(0); const [historyError, setHistoryError] = useState('');
   const refresh = useCallback(async signal => {
     if (!snapshot.current) return;
-    try { const result = await api.listDecisions(stockCode, signal, page, snapshot.current); if (!signal.aborted) {setHistory(result);setHistoryError('');} }
+    try { const result = await api.listDecisions(stockCode, signal, page, snapshot.current); if (!signal.aborted) {setHistory({ ...result, items: result.items.filter(item => item.mode !== 'INTEGRATED_DECISION') });setHistoryError('');} }
     catch (e) { if (!signal.aborted) setHistoryError(e.message); }
   }, [stockCode, page]);
   useEffect(() => { const c = new AbortController(); refresh(c.signal); return () => c.abort(); }, [refresh, currentSnapshot]);
@@ -29,9 +29,10 @@ export default function NewsInsightsPanel({ snapshotId, stockCode, aiConfigured,
     if (!snapshotId) return;
     const c = new AbortController();active.current = c;setBusy(true);
     const id = embedded ? null : new URLSearchParams(window.location.search).get('decision');
-    const restored = id ? api.getDecision(id, c.signal) : api.listDecisions(stockCode, c.signal, 0, snapshotId).then(list => list.items[0] ? api.getDecision(list.items[0].id, c.signal) : null);
+    const restored = id ? api.getDecision(id, c.signal) : api.listDecisions(stockCode, c.signal, 0, snapshotId).then(list => { const item = list.items.find(v => v.mode !== 'INTEGRATED_DECISION'); return item ? api.getDecision(item.id, c.signal) : null; });
     restored.then(saved => {
       if (!saved || c.signal.aborted) return;
+      if (saved.mode === 'INTEGRATED_DECISION') return;
       if (saved.context?.lookbackDays) {setDays(saved.context.lookbackDays);setSector(saved.context.sectorQuery || '');}
       return track(saved, c.signal);
     }).catch(e => { if (!c.signal.aborted) setError(e.message); }).finally(() => {if (active.current === c) {active.current = null;setBusy(false);}});

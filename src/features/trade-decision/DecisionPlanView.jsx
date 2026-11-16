@@ -11,6 +11,7 @@ export default function DecisionPlanView({ policy, onSelectPeriod }) {
   return <Stack gap={1.5}>
     <Typography fontWeight={700}>{h.horizonTradingDays}거래일 가격 계획 · {h.focus}</Typography>
     <Typography variant="caption" color="text.secondary">가격일 {policy.priceDate} · 관측 {h.lookbackBars}거래일 · 현재 시세가 아닌 저장 종가 기준</Typography>
+    <Typography variant="caption" color="text.secondary">기간별 가격 계획은 관측 저항을 기준으로 산출합니다. 종합분석의 신고가 가정 목표와 기준이 달라 목표가가 없거나 서로 다를 수 있습니다.</Typography>
     {h.status !== 'AVAILABLE' && <Alert severity="warning">{h.reason}</Alert>}
     {h.status === 'AVAILABLE' && <>
       <Stack direction="row" gap={1} flexWrap="wrap"><MetricReferences ids={['CURRENT', 'ENTRY_LOW', 'ENTRY_HIGH', 'STOP', 'TARGET_ONE', 'TARGET_TWO']} metrics={metrics} /></Stack>

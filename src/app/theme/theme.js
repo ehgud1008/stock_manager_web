@@ -17,6 +17,8 @@ const theme = createTheme({
     h1: { fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 600, letterSpacing: '-0.055em', lineHeight: 1.08 },
     h2: { fontSize: '1.5rem', fontWeight: 600, letterSpacing: '-0.035em' },
     h3: { fontSize: '1.05rem', fontWeight: 600, letterSpacing: '-0.02em' },
+    body2: { fontSize: '0.875rem', lineHeight: 1.65 },
+    caption: { fontSize: '0.8125rem', lineHeight: 1.6 },
     button: { fontWeight: 600, textTransform: 'none' },
     overline: { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em' },
   },

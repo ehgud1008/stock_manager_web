@@ -70,7 +70,7 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
     if (embedded && !effectiveSnapshot.current) { setHistory([]); setHasMore(false); return; }
     try {
       const data = await api.listDecisions(stockCode, signal, historyPage, embedded ? effectiveSnapshot.current : null);
-      if (!signal.aborted) { setHistory(data.items); setHasMore(data.hasMore); setHistoryError(''); }
+      if (!signal.aborted) { setHistory(data.items.filter(item => item.mode !== 'INTEGRATED_DECISION')); setHasMore(data.hasMore); setHistoryError(''); }
     } catch (e) { if (!signal.aborted) setHistoryError(e.message); }
   }, [stockCode, historyPage, embedded]);
   useEffect(() => { const c = new AbortController(); refresh(c.signal); return () => c.abort(); }, [refresh, savedSnapshotId]);
@@ -87,7 +87,7 @@ export default function TradeDecisionPanel({ snapshotId, stockCode, aiConfigured
     if (!id && !(embedded && snapshotId)) return;
     const c = new AbortController(); active.current = c; setBusy(true);
     const restored = id ? api.getDecision(id, c.signal) : api.listDecisions(stockCode, c.signal, 0, snapshotId)
-      .then(data => data.items[0] && !c.signal.aborted ? api.getDecision(data.items[0].id, c.signal) : null);
+      .then(data => { const item = data.items.find(v => v.mode !== 'INTEGRATED_DECISION' && v.mode !== 'NEWS_INSIGHTS'); return item && !c.signal.aborted ? api.getDecision(item.id, c.signal) : null; });
     restored.then(j => {
       if (j && !c.signal.aborted) {
         const context = j.context || j.result?.context;

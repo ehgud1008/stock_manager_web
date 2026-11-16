@@ -10,6 +10,12 @@ const stock = { code: '373220', name: 'LG에너지솔루션', market: 'KOSPI', d
 const view = { state: 'READY', runId: 'one', selectionDate: '2026-10-19', firstTrackingDate: '2026-10-20', lastTrackingDate: '2026-11-16', checkedAt: '2026-10-19T12:00:00Z', stocks: [stock], notes: [] };
 
 describe('선정 종목 시나리오 추적', () => {
+  it('retains the saved synthetic basis beside frozen target and stop prices', async () => {
+    api.getScenarioMonitoring.mockResolvedValue({ ...view, stocks: [{ ...stock, scenario: { ...stock.scenario, targetBasis: 'STRUCTURAL_RISK_MULTIPLE' } }] });
+    render(<ScenarioMonitoringPanel runId="one" />);
+    expect(await screen.findByRole('table', { name: '선정 종목 시나리오 추적' })).toHaveTextContent('신고가 가정 목표 · 2R / 3.5R');
+    expect(screen.getByText(/관측 저항이나 도달 예측이 아닙니다/)).toBeInTheDocument();
+  });
   beforeEach(() => { vi.resetAllMocks(); api.getScenarioMonitoring.mockResolvedValue(view); });
   it('평가 등록과 후속 일봉 없이도 선정 종목과 고정 목표·손절을 표시한다', async () => {
     const onDetail = vi.fn();render(<ScenarioMonitoringPanel runId="one" onDetail={onDetail} />);

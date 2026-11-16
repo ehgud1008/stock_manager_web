@@ -2,8 +2,9 @@ import SavedUnifiedDetail from '../../features/unified-analysis/SavedUnifiedDeta
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, LinearProgress, MenuItem,
-  Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from '@mui/material';
+import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, LinearProgress, MenuItem,
+  Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import * as api from '../../api/unifiedAnalysisApi';
@@ -21,8 +22,14 @@ const koreanTime = value => value == null ? '—' : new Date(value).toLocaleStri
 const number = (value, digits = 1) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { maximumFractionDigits: digits });
 
 export default function UnifiedAnalysisPage() {
+  const theme = useTheme();
+  const mobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [advanced, setAdvanced] = useState(false);
+  const [columns, setColumns] = useState(false);
+  const [operations, setOperations] = useState(false);
   const [searchParams] = useSearchParams();
   const [runs, setRuns] = useState([]);
+  const [runsLoaded, setRunsLoaded] = useState(false);
   const [runId, setRunId] = useState(() => /^[0-9a-f-]{36}$/i.test(searchParams.get('runId') || '') ? searchParams.get('runId') : '');
   const [market, setMarket] = useState('ALL');
   const [draft, setDraft] = useState(initialFilters);
@@ -45,7 +52,8 @@ export default function UnifiedAnalysisPage() {
     const controller = new AbortController();
     api.listUnifiedRuns(controller.signal).then(data => {
       if (!controller.signal.aborted) { setRuns(data); setRunId(id => id || data[0]?.runId || ''); }
-    }).catch(e => { if (!controller.signal.aborted) setError(e.message); });
+    }).catch(e => { if (!controller.signal.aborted) setError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setRunsLoaded(true); });
     return () => controller.abort();
   }, [refresh]);
   useEffect(() => {
@@ -92,26 +100,44 @@ export default function UnifiedAnalysisPage() {
 
   return <Stack gap={2.5}>
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2}>
-      <Box><Typography variant="overline" color="primary.main">UNIFIED ANALYSIS</Typography><Typography variant="h1" mt={0.5}>종합분석</Typography>
+      <Box><Typography variant="overline" color="primary.main">UNIFIED ANALYSIS</Typography><Typography variant="h1" sx={{ fontSize: { xs: '1.8rem', md: '2.5rem' } }} mt={0.5}>종합분석</Typography>
         <Typography color="text.secondary" mt={1}>시장 전체의 추세와 매매 조건을 함께 분석하고, 원하는 종목을 찾아보세요.</Typography></Box>
-      <Button component={Link} to="/unified-analysis/stock" sx={{ alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>개별 종합분석</Button>
+      <Stack direction="row" gap={1} sx={{ display: { xs: 'none', sm: 'flex' }, alignSelf: 'flex-start', flexShrink: 0 }}>
+        <Button color="inherit" component={Link} to={run?.eod ? '/daily-reports?runId=' + encodeURIComponent(runId) : '/daily-reports'}>장 마감 리포트 열기</Button>
+        <Button variant="outlined" color="inherit" component={Link} to="/unified-analysis/stock">개별 종합분석</Button>
+      </Stack>
     </Stack>
+    {error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRefresh(n => n + 1)}>다시 조회</Button>}>{error}</Alert>}
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems={{ sm: 'center' }}>
+      <TextField select label="분석 실행 이력" value={runs.some(item => item.runId === runId) ? runId : ''} disabled={busy} onChange={e => { setRunId(e.target.value); setPage(0); setSelection(null); }} sx={{ flex: 1, minWidth: 0 }}>
+        <MenuItem value="">{runId ? '실행 정보를 불러오는 중' : '저장된 실행 없음'}</MenuItem>
+        {runs.map(item => <MenuItem key={item.runId} value={item.runId}>{item.baseDate} · {item.market === 'ALL' ? '전체 시장' : item.market} · {STATUS[item.status]}</MenuItem>)}
+      </TextField>
+      <Stack direction="row" gap={1}>
+        <Button color="inherit" startIcon={<RefreshRoundedIcon />} disabled={busy} onClick={() => { setError(''); setRefresh(n => n + 1); }}>새로고침</Button>
+        <Button color="inherit" variant="outlined" onClick={() => setOperations(value => !value)} aria-expanded={operations || (!run && runsLoaded)} aria-controls="analysis-operations">분석 실행·관리</Button>
+      </Stack>
+    </Stack>
+    {run && <Box sx={{ borderLeft: '3px solid', borderColor: run.failed ? 'warning.main' : 'primary.main', pl: 2 }}>
+      <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+        <Typography variant="body2" fontWeight={650}>선택한 결과는 {run.baseDate} {run.eod ? '거래일' : '기준일'} 기준입니다.</Typography>
+        <Chip size="small" label={STATUS[run.status]} color={run.failed ? 'warning' : 'default'} variant="outlined" />
+      </Stack>
+      <Typography variant="body2" color="text.secondary" mt={0.75}>완료 {number(run.completed, 0)} · 실패 {number(run.failed, 0)} · 제외 {number(run.skipped, 0)}종목. {running(run) ? '완료된 결과부터 조회할 수 있습니다.' : '완료된 종목의 결과를 조회할 수 있습니다.'}</Typography>
+      {running(run) && <LinearProgress aria-label="분석 진행 중" sx={{ mt: 1 }} />}
+      {!!run.failed && <Button size="small" color="inherit" onClick={() => setOperations(true)}>실패 항목과 실행 상태 확인</Button>}
+    </Box>}
+    <Box id="analysis-operations" hidden={!operations && (!!run || !runsLoaded)}>
+      <Stack gap={2}>
     <SectionCard title="시장 전체 분석" caption="한국시간 20시 이후 분석 가능한 거래일의 국내 일반주식을 분석합니다. 마감 자료를 확인한 뒤 결과를 저장합니다. 새 분석부터 기준일 시가 2,000원 이하 종목은 매매 후보에서 제외하고 시장 통계에는 포함합니다.">
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField select size="small" label="분석 대상 시장" value={market} disabled={busy} onChange={e => setMarket(e.target.value)} sx={{ minWidth: 180 }}>
           <MenuItem value="ALL">코스피 + 코스닥</MenuItem><MenuItem value="KOSPI">코스피</MenuItem><MenuItem value="KOSDAQ">코스닥</MenuItem>
         </TextField>
-        <Button variant="contained" startIcon={<PlayArrowRoundedIcon />} disabled={busy || activeRun} onClick={() => setConfirm('start')}>전체 종합분석 실행</Button>
-        <Button startIcon={<RefreshRoundedIcon />} disabled={busy} onClick={() => { setError(''); setRefresh(n => n + 1); }}>새로고침</Button>
+        <Button variant="outlined" startIcon={<PlayArrowRoundedIcon />} disabled={busy || activeRun} onClick={() => setConfirm('start')}>전체 종합분석 실행</Button>
       </Stack>
       <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>완료된 종목부터 결과를 확인할 수 있습니다. 브라우저를 닫아도 서버에서 계속 실행됩니다.</Typography>
     </SectionCard>
-    {run && <Alert severity="info">선택한 결과는 {run.baseDate} {run.eod ? '거래일' : '기준일'} 기준입니다. 최신 실행이 대기 중이면 분석 완료 후 결과를 확인하세요.</Alert>}
-    {error && <Alert severity="error">{error}</Alert>}
-    <TextField select label="분석 실행 이력" value={runId} disabled={busy} onChange={e => { setRunId(e.target.value); setPage(0); setSelection(null); }}>
-      {!runs.length && <MenuItem value="">저장된 실행 없음</MenuItem>}
-      {runs.map(item => <MenuItem key={item.runId} value={item.runId}>{item.baseDate} · {item.market === 'ALL' ? '전체 시장' : item.market} · {STATUS[item.status]} · {item.runId.slice(0, 8)}</MenuItem>)}
-    </TextField>
     {run && <SectionCard title="실행 현황" action={<Chip size="small" label={STATUS[run.status]} variant="outlined" color={run.failed ? 'warning' : running(run) ? 'primary' : 'default'} />}>
       <Grid container spacing={2}>{[['대상 종목', run.total], ['분석 완료', run.completed], ['실패', run.failed], ['제외', run.skipped]].map(([label, value]) => <Grid key={label} size={3}>
         <Typography color="text.secondary" variant="caption">{label}</Typography><Typography sx={{ fontSize: { xs: 24, md: 32 }, fontWeight: 650 }}>{number(value, 0)}</Typography>
@@ -129,15 +155,29 @@ export default function UnifiedAnalysisPage() {
       </Stack>
       {run.errorCode && <Alert severity={running(run) ? 'info' : 'warning'} sx={{ mt: 1 }}>{running(run) ? '자료 확인 또는 자동 복구를 기다리고 있습니다.' : '실행 결과를 확인하세요. 재시도 가능한 항목이 없거나 실행 기한이 지나면 새 분석이 필요합니다.'} ({run.errorCode})</Alert>}
     </SectionCard>}
-    <Alert severity="info" action={<Button component={Link} to={run?.eod ? '/daily-reports?runId=' + encodeURIComponent(runId) : '/daily-reports'}>장 마감 리포트 열기</Button>}>시장 보고서·선정 종목·성과 검증·알림 상태는 장 마감 리포트 메뉴에서 확인하세요.</Alert>
-    <SectionCard title="결과 검색" caption="스테이지와 점수·신호 조건을 함께 적용합니다.">
+      </Stack>
+    </Box>
+    <SectionCard title="종목 찾기" caption="종목명·시장·스테이지로 저장된 결과를 검색하세요.">
       <Box component="form" onSubmit={e => { e.preventDefault(); setFilters({ ...draft }); setPage(0); }}><Stack gap={1.5}>
-        <Stack direction="row" gap={1.5} flexWrap="wrap">
+        <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
           <TextField size="small" label="종목명·코드" value={draft.search} onChange={e => change('search', e.target.value)} sx={{ flexGrow: 1, minWidth: 180 }} />
+          {!mobile && select('market', '결과 시장', { KOSPI: '코스피', KOSDAQ: '코스닥' })}
+          {!mobile && select('stage', '스테이지', Object.fromEntries(STAGES.map(item => [item.id, `S${item.id} · ${item.label}`])))}
+        </Stack>
+        <Accordion expanded={advanced} onChange={(_, value) => setAdvanced(value)} disableGutters elevation={0} sx={{ bgcolor: 'transparent', '&:before': { display: 'none' } }}>
+          <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />} aria-controls="advanced-search" id="advanced-search-heading"><Typography variant="body2">상세 검색 조건{Object.keys(draft).some(key => key !== 'search' && (mobile || !['market', 'stage', 'sort', 'ascending'].includes(key)) && draft[key] !== initialFilters[key]) ? ' · 설정 있음' : ''}</Typography></AccordionSummary>
+          <AccordionDetails id="advanced-search" sx={{ px: 0 }}><Stack gap={1.5}>
+        {mobile && <Stack gap={1.5}>
           {select('market', '결과 시장', { KOSPI: '코스피', KOSDAQ: '코스닥' })}
-          <TextField size="small" type="number" label="최소 거래량 (주)" value={draft.minVolume} onChange={e => change('minVolume', e.target.value)} slotProps={{ htmlInput: { min: 0, step: 1, max: Number.MAX_SAFE_INTEGER } }} sx={{ width: 180 }} />
-          <TextField size="small" type="number" label="최소 거래대금 (억원)" value={draft.minTradingAmountEok} onChange={e => change('minTradingAmountEok', e.target.value)} slotProps={{ htmlInput: { min: 0, step: 0.000001 } }} sx={{ width: 180 }} />
           {select('stage', '스테이지', Object.fromEntries(STAGES.map(item => [item.id, `S${item.id} · ${item.label}`])))}
+          <TextField select label="정렬 기준" value={draft.sort} onChange={e => change('sort', e.target.value)}>
+            {Object.entries({ totalScore: '스윙 적합도', stage: '스테이지', rewardRisk: '손익비', barsSinceTransition: '전환 후 봉 수', stockCode: '종목 코드' }).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}
+          </TextField>
+          <TextField select label="정렬 방향" value={String(draft.ascending)} onChange={e => change('ascending', e.target.value === 'true')}><MenuItem value="false">높은 순</MenuItem><MenuItem value="true">낮은 순</MenuItem></TextField>
+        </Stack>}
+        <Stack direction="row" gap={1.5} flexWrap="wrap">
+          <TextField size="small" type="number" label="최소 거래량 (주)" value={draft.minVolume} onChange={e => change('minVolume', e.target.value)} slotProps={{ htmlInput: { min: 0, step: 1, max: Number.MAX_SAFE_INTEGER } }} sx={{ width: { xs: '100%', sm: 180 } }} />
+          <TextField size="small" type="number" label="최소 거래대금 (억원)" value={draft.minTradingAmountEok} onChange={e => change('minTradingAmountEok', e.target.value)} slotProps={{ htmlInput: { min: 0, step: 0.000001 } }} sx={{ width: { xs: '100%', sm: 180 } }} />
           {select('signal', '매매 신호', SIGNAL)}
           {select('entryStatus', '진입 상태', ENTRY)}
           {select('transition', '전환 방향', { FORWARD: '순행', REVERSE: '역행', SKIPPED: '단계 건너뜀', UNKNOWN: '미확인' })}
@@ -149,38 +189,57 @@ export default function UnifiedAnalysisPage() {
           {select('status', '처리 상태', { COMPLETED: '완료', FAILED: '실패', PENDING: '미처리', RETRY_WAIT: '확인·재시도 대기', DATA_UNAVAILABLE: '당일 자료 부족', SKIPPED: '제외' })}
           {select('quality', '데이터 상태', QUALITY)}
         </Stack>
+          </Stack></AccordionDetails>
+        </Accordion>
         <Stack direction="row" gap={1.5} flexWrap="wrap">
-          <TextField select size="small" label="정렬 기준" value={draft.sort} onChange={e => change('sort', e.target.value)} sx={{ minWidth: 160 }}>
+          {!mobile && <TextField select size="small" label="정렬 기준" value={draft.sort} onChange={e => change('sort', e.target.value)} sx={{ minWidth: 160 }}>
             {Object.entries({ totalScore: '스윙 적합도', stage: '스테이지', rewardRisk: '손익비', barsSinceTransition: '전환 후 봉 수', stockCode: '종목 코드' }).map(([key, label]) => <MenuItem key={key} value={key}>{label}</MenuItem>)}
-          </TextField>
-          <TextField select size="small" label="정렬 방향" value={String(draft.ascending)} onChange={e => change('ascending', e.target.value === 'true')} sx={{ minWidth: 120 }}><MenuItem value="false">높은 순</MenuItem><MenuItem value="true">낮은 순</MenuItem></TextField>
-          <Box flex={1} /><Button onClick={() => { setDraft(initialFilters); setFilters(initialFilters); setPage(0); }}>초기화</Button>
-          <Button type="submit" variant="outlined" startIcon={<SearchRoundedIcon />} disabled={!runId}>검색</Button>
+          </TextField>}
+          {!mobile && <TextField select size="small" label="정렬 방향" value={String(draft.ascending)} onChange={e => change('ascending', e.target.value === 'true')} sx={{ minWidth: 120 }}><MenuItem value="false">높은 순</MenuItem><MenuItem value="true">낮은 순</MenuItem></TextField>}
+          <Box flex={1} /><Button color="inherit" onClick={() => { setDraft(initialFilters); setFilters(initialFilters); setPage(0); }}>초기화</Button>
+          <Button type="submit" variant="contained" startIcon={<SearchRoundedIcon />} disabled={!runId}>검색</Button>
         </Stack>
       </Stack></Box>
     </SectionCard>
-    <SectionCard title="종합분석 결과" caption={run ? `${run.baseDate} 기준 · 검색 결과 ${number(result?.totalElements || 0, 0)}종목` : '저장된 실행을 선택하거나 새 분석을 시작하세요.'}>
+    <SectionCard title="종합분석 결과" caption={run ? `${run.baseDate} 기준 · 검색 결과 ${number(result?.totalElements, 0)}종목` : '저장된 실행을 선택하거나 새 분석을 시작하세요.'} action={!mobile && <Button color="inherit" size="small" onClick={() => setColumns(value => !value)} aria-pressed={columns}>{columns ? '핵심 항목만' : '전체 항목 보기'}</Button>}>
       {loading && <LinearProgress aria-label="결과 조회 중" />}
-      <TableContainer><Table size="small" aria-label="종합분석 결과 목록" sx={{ minWidth: 1080 }}><TableHead><TableRow>
-        {['종목', '스테이지 / 전환', '적합도', '매수 신호', '보유 시 매도', '진입 상태', '기준 종가 / 가격일', '거래량 (주)', '거래대금 (억원)', '손익비', '처리 / 데이터', '상세'].map(label => <TableCell key={label} sx={{ whiteSpace: 'nowrap' }}>{label}</TableCell>)}
+      {mobile ? <Stack component="ul" aria-label="종합분석 결과 목록" sx={{ listStyle: 'none', p: 0, m: 0 }} gap={1.5}>
+        {(result?.content || []).map(item => <Box component="li" key={item.stockCode} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
+            <Box><Typography fontWeight={650}>{item.stockName}</Typography><Typography variant="caption" color="text.secondary">{item.stockCode} · {item.market}</Typography></Box>
+            <Chip size="small" label={`적합도 ${number(item.totalScore)}`} variant="outlined" />
+          </Stack>
+          <Typography variant="body2" mt={1.5}>{item.stage ? `S${item.stage} · ${STAGES[item.stage - 1]?.label || '미판정'}` : '스테이지 미판정'} · {SIGNAL[item.buySignal] || '매수 신호 없음'}</Typography>
+          <Typography variant="body2" color="text.secondary" mt={0.5}>{ENTRY[item.entryStatus] || '진입 상태 미확인'} · 손익비 {item.rewardRisk == null ? '미확인' : `${number(item.rewardRisk, 2)}배`}</Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mt={1}>
+            <Box><Typography variant="body2">기준 종가 {number(item.currentPrice, 0)}원</Typography><Typography variant="caption" color="text.secondary">{item.priceDate || '가격일 미확인'} · {STATUS[item.status]} · {QUALITY[item.quality] || '자료 확인 필요'}</Typography></Box>
+            <Button disabled={item.status !== 'COMPLETED'} onClick={() => setSelection({ runId, code: item.stockCode, name: item.stockName })} aria-label={`${item.stockName} 상세`}>상세</Button>
+          </Stack>
+        </Box>)}
+        {!loading && !result?.content?.length && <Typography component="li" color="text.secondary" sx={{ py: 3 }}>{error ? '결과를 조회하지 못했습니다. 다시 조회하세요.' : runId ? '조건에 해당하는 결과가 없습니다.' : '저장된 실행을 선택하거나 새 분석을 시작하세요.'}</Typography>}
+      </Stack> : <>
+      <TableContainer tabIndex={0} aria-label="종합분석 결과 표 가로 스크롤"><Table size="small" aria-label="종합분석 결과 목록" sx={{ minWidth: columns ? 1480 : 940, '& th, & td': { px: 1.5, py: 1.75 }, '& td': { fontVariantNumeric: 'tabular-nums' } }}><TableHead><TableRow>
+        {['종목', '스테이지 / 전환', '적합도', '매수 신호', ...(columns ? ['보유 시 매도'] : []), '진입 상태', '기준 종가 / 가격일', ...(columns ? ['거래량 (주)', '거래대금 (억원)'] : []), '손익비', ...(columns ? ['처리 / 데이터'] : []), '상세'].map(label => <TableCell key={label} sx={{ whiteSpace: 'nowrap' }}>{label}</TableCell>)}
       </TableRow></TableHead><TableBody>
         {(result?.content || []).map(item => { const stage = STAGES[(item.stage || 0) - 1]; return <TableRow key={item.stockCode} hover>
-          <TableCell><Typography variant="body2" fontWeight={650}>{item.stockName}</Typography><Typography variant="caption" color="text.secondary">{item.stockCode} · {item.market}</Typography></TableCell>
+          <TableCell sx={{ minWidth: 160, whiteSpace: 'nowrap' }}><Typography variant="body2" fontWeight={650}>{item.stockName}</Typography><Typography variant="caption" color="text.secondary">{item.stockCode} · {item.market}</Typography>{!columns && (item.status !== 'COMPLETED' || item.quality !== 'COMPLETE') && <Typography variant="caption" display="block" color="warning.main">{item.status !== 'COMPLETED' ? STATUS[item.status] : QUALITY[item.quality] || '자료 확인 필요'}</Typography>}</TableCell>
           <TableCell><Chip size="small" variant="outlined" label={stage ? `S${stage.id} · ${stage.label}` : '미판정'} sx={{ color: stage?.color }} /><Typography variant="caption" display="block" mt={0.5}>{item.previousStage == null ? '—' : `S${item.previousStage}`} → {item.stage == null ? '—' : `S${item.stage}`}{item.barsSinceTransition == null ? '' : ` · ${item.barsSinceTransition}봉`}</Typography></TableCell>
           <TableCell><Typography fontWeight={700}>{number(item.totalScore)}</Typography></TableCell>
-          <TableCell>{SIGNAL[item.buySignal] || '—'}</TableCell><TableCell>{SIGNAL[item.sellSignal] || '—'}</TableCell>
+          <TableCell>{SIGNAL[item.buySignal] || '—'}</TableCell>{columns && <TableCell>{SIGNAL[item.sellSignal] || '—'}</TableCell>}
           <TableCell>{ENTRY[item.entryStatus] || '—'}</TableCell>
           <TableCell>{number(item.currentPrice, 0)}<Typography variant="caption" display="block" color="text.secondary">{item.priceDate || '—'}</Typography></TableCell>
-          <TableCell>{item.volume == null ? '미저장·미확인' : number(item.volume, 0)}</TableCell>
-          <TableCell>{item.tradingAmountMillionWon == null ? '미저장·미확인' : number(item.tradingAmountMillionWon / 100, 6)}</TableCell>
+          {columns && <TableCell>{item.volume == null ? '미저장·미확인' : number(item.volume, 0)}</TableCell>}
+          {columns && <TableCell>{item.tradingAmountMillionWon == null ? '미저장·미확인' : number(item.tradingAmountMillionWon / 100, 6)}</TableCell>}
           <TableCell>{item.rewardRisk == null ? '—' : `${number(item.rewardRisk, 2)}배`}</TableCell>
-          <TableCell>{STATUS[item.status]}<Typography variant="caption" display="block" color="text.secondary">{QUALITY[item.quality] || ({ STOCK_STATE_EXCLUDED: '거래 상태 제외', COLLECTION_OR_ANALYSIS_FAILED: '수집·분석 실패' }[item.errorCode]) || '—'}</Typography></TableCell>
+          {columns && <TableCell>{STATUS[item.status]}<Typography variant="caption" display="block" color="text.secondary">{QUALITY[item.quality] || ({ STOCK_STATE_EXCLUDED: '거래 상태 제외', COLLECTION_OR_ANALYSIS_FAILED: '수집·분석 실패' }[item.errorCode]) || '—'}</Typography></TableCell>}
           <TableCell><Button size="small" disabled={item.status !== 'COMPLETED'} onClick={() => setSelection({ runId, code: item.stockCode, name: item.stockName })}>상세</Button></TableCell>
         </TableRow>; })}
-        {!loading && !result?.content?.length && <TableRow><TableCell colSpan={12} align="center" sx={{ py: 6, color: 'text.secondary' }}>{error ? '결과를 조회하지 못했습니다. 오류를 확인한 뒤 새로고침하세요.' : runId ? '조건에 해당하는 결과가 없습니다.' : '전체 종합분석을 실행하면 종목별 결과가 여기에 표시됩니다.'}</TableCell></TableRow>}
+        {!loading && !result?.content?.length && <TableRow><TableCell colSpan={columns ? 12 : 8} align="center" sx={{ py: 6, color: 'text.secondary' }}>{error ? '결과를 조회하지 못했습니다. 오류를 확인한 뒤 새로고침하세요.' : runId ? '조건에 해당하는 결과가 없습니다.' : '전체 종합분석을 실행하면 종목별 결과가 여기에 표시됩니다.'}</TableCell></TableRow>}
       </TableBody></Table></TableContainer>
-      <TablePagination component="div" count={result?.totalElements || 0} page={page} rowsPerPage={size} rowsPerPageOptions={[20, 50, 100]} onPageChange={(_, value) => setPage(value)} onRowsPerPageChange={e => { setSize(Number(e.target.value)); setPage(0); }} labelRowsPerPage="표시 개수" />
+      </>}
+      <TablePagination component="div" count={result?.totalElements || 0} page={page} rowsPerPage={size} rowsPerPageOptions={[20, 50, 100]} onPageChange={(_, value) => setPage(value)} onRowsPerPageChange={e => { setSize(Number(e.target.value)); setPage(0); }} labelRowsPerPage="표시 개수" labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${number(count, 0)}종목`} getItemAriaLabel={type => type === 'next' ? '다음 페이지' : '이전 페이지'} sx={{ '& .MuiTablePagination-toolbar': { flexWrap: 'wrap', px: 0 }, '& .MuiTablePagination-selectLabel': { display: { xs: 'none', sm: 'block' } } }} />
     </SectionCard>
+    {mobile && <Stack direction="row" gap={1} flexWrap="wrap"><Button color="inherit" component={Link} to={run?.eod ? '/daily-reports?runId=' + encodeURIComponent(runId) : '/daily-reports'}>장 마감 리포트 열기</Button><Button color="inherit" component={Link} to="/unified-analysis/stock">개별 종합분석</Button></Stack>}
     {confirm && <Dialog open onClose={() => setConfirm(null)}><DialogTitle>{confirm === 'start' ? '시장 전체 종합분석 실행' : confirm === 'resume' ? '종합분석 재개' : '중단 상태 정리'}</DialogTitle>
       <DialogContent>{confirm === 'start' ? `${market === 'ALL' ? '코스피·코스닥' : market} 일반주식의 추세·점수·신호를 함께 분석합니다. 수집에 시간이 걸리며 서버에서 계속 실행됩니다.` : confirm === 'resume' ? '실패·미처리 종목만 다시 분석합니다. 완료 결과와 대상 목록·기준일은 유지합니다.' : '서버 재시작 후 남은 실행 상태를 정리합니다. 실제 실행 중인 작업은 정리할 수 없습니다.'}</DialogContent>
       <DialogActions><Button onClick={() => setConfirm(null)}>취소</Button><Button onClick={execute}>확인</Button></DialogActions>

@@ -10,12 +10,30 @@ export default function SavedUnifiedDetail({ selection, onClose, latest = false 
   const [retry, setRetry] = useState(0);
   const [tab, setTab] = useState('stage');
   const [aiVisited, setAiVisited] = useState(false);
+  const [continuity, setContinuity] = useState(null);
   const contentRef = useRef(null);
   useEffect(() => {
     const controller = new AbortController();
     setState({ loading: true });
+    setContinuity(null);
     (latest ? api.analyzeUnifiedStock(selection.code, controller.signal) : api.getUnifiedDetail(selection.runId, selection.code, controller.signal))
-      .then(data => { if (!controller.signal.aborted) setState({ data }); })
+      .then(async data => {
+        if (controller.signal.aborted) return;
+        setState({ data });
+        if (latest) return;
+        try {
+          const history = await api.getUnifiedScoreHistory(selection.runId, selection.code, controller.signal);
+          if (controller.signal.aborted) return;
+          const selected = history.find(row => row.runId === selection.runId);
+          const older = history.find(item => item.priceDate < data.result.priceDate
+            && item.engineVersion === selected?.engineVersion
+            && item.priceBasis === selected?.priceBasis);
+          const previous = older ? await api.getUnifiedDetail(older.runId, selection.code, controller.signal) : null;
+          if (!controller.signal.aborted) setContinuity({ history, selected, older, previous });
+        } catch {
+          if (!controller.signal.aborted) setContinuity({ unavailable: true });
+        }
+      })
       .catch(error => { if (!controller.signal.aborted) setState({ error: error.message }); });
     return () => controller.abort();
   }, [selection, retry, latest]);
@@ -32,7 +50,7 @@ export default function SavedUnifiedDetail({ selection, onClose, latest = false 
       {state.loading && <LinearProgress aria-label="상세 조회 중" />}
       {state.error && <Alert severity="error" action={<Button color="inherit" onClick={() => setRetry(n => n + 1)}>다시 조회</Button>}>{state.error}</Alert>}
       {['stage', 'analysis', 'chart'].map(value => <Box key={value} role="tabpanel" id={`unified-detail-${value}-panel`} aria-labelledby={`unified-detail-${value}-tab`} hidden={tab !== value}>
-        {state.data && tab === value && <UnifiedAnalysisResults data={state.data} saved={!latest} section={value} />}
+        {state.data && tab === value && <UnifiedAnalysisResults data={state.data} saved={!latest} section={value} continuity={continuity} />}
       </Box>)}
       <Box role="tabpanel" id="unified-detail-ai-panel" aria-labelledby="unified-detail-ai-tab" hidden={tab !== 'ai'}>
         {!latest && state.data && aiVisited && <UnifiedDecisionTab key={`${selection.runId}:${selection.code}`} runId={selection.runId} stockCode={selection.code} priceDate={state.data.result.priceDate} holdingAnalysis={state.data.holdingAnalysis} />}

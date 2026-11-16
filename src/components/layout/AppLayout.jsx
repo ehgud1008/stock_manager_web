@@ -8,7 +8,7 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import { AppBar, Box, Chip, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Stack, Toolbar, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 const drawerWidth = 248;
@@ -26,7 +26,6 @@ const navigation = [
 
 function NavigationContent({ onNavigate }) {
   const location = useLocation();
-  const screener = ['/screener', '/analysis-scans', '/unified-analysis', '/daily-reports'].some(path => location.pathname.startsWith(path));
   return (
     <Stack height="100%">
       <Stack direction="row" alignItems="center" gap={1.25} px={2.5} py={2.8}>
@@ -34,22 +33,25 @@ function NavigationContent({ onNavigate }) {
         <Box><Typography fontWeight={700} letterSpacing="-.03em">STOCKSCOPE</Typography><Typography variant="caption" color="text.secondary">ANALYSIS CONSOLE</Typography></Box>
       </Stack>
       <Divider />
-      <Typography variant="overline" color="text.secondary" px={2.5} pt={3} pb={1}>WORKSPACE</Typography>
+      <Typography variant="overline" color="text.secondary" px={2.5} pt={3} pb={1}>시장과 종목</Typography>
       <List sx={{ px: 1.5 }}>
         {navigation.map((item) => {
           const selected = item.path === '/' ? location.pathname === '/' : item.path.startsWith('/analysis/') ? location.pathname.startsWith('/analysis/') : location.pathname.startsWith(item.path);
           return (
-            <ListItemButton key={item.path} component={NavLink} to={item.path} onClick={onNavigate} selected={selected} sx={{ mb: 0.5, borderRadius: 2, '&.Mui-selected': { bgcolor: 'rgba(139,218,99,.1)', color: 'primary.light', '&:hover': { bgcolor: 'rgba(139,218,99,.14)' } } }}>
+            <Fragment key={item.path}>
+            {item.path === '/analysis-scans' && <Typography component="li" variant="overline" color="text.secondary" sx={{ listStyle: 'none', px: 1, pt: 2, pb: 1 }}>고급 분석 도구</Typography>}
+            <ListItemButton component={NavLink} to={item.path} onClick={onNavigate} selected={selected} sx={{ mb: 0.5, borderRadius: 2, '&.Mui-selected': { bgcolor: 'rgba(139,218,99,.1)', color: 'primary.light', '&:hover': { bgcolor: 'rgba(139,218,99,.14)' } } }}>
               <ListItemIcon sx={{ minWidth: 38, color: selected ? 'primary.main' : 'text.secondary' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: 14, fontWeight: selected ? 650 : 500 }} />
             </ListItemButton>
+            </Fragment>
           );
         })}
       </List>
       <Box mt="auto" p={2}>
         <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,.035)', border: '1px solid', borderColor: 'divider' }}>
-          <Stack direction="row" alignItems="center" gap={1}><Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: screener ? 'text.secondary' : 'success.main' }} /><Typography variant="caption" fontWeight={600}>{screener ? '서버 분석 연결' : 'Mock API 연결됨'}</Typography></Stack>
-          <Typography variant="caption" color="text.secondary" display="block" mt={1}>{screener ? '연결·실행 상태는 화면에서 확인하세요.' : '실제 시세·분석 결과가 아닙니다.'}</Typography>
+          <Typography variant="body2" fontWeight={600}>분석 자료 안내</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" mt={1}>분석 기준일과 종목별 가격일을 확인하세요. 분석 결과는 수익을 보장하지 않습니다.</Typography>
         </Box>
       </Box>
     </Stack>
@@ -57,7 +59,6 @@ function NavigationContent({ onNavigate }) {
 }
 
 export default function AppLayout() {
-  const location = useLocation();
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -67,9 +68,9 @@ export default function AppLayout() {
       <AppBar position="fixed" elevation={0} sx={{ width: { md: `calc(100% - ${drawerWidth}px)` }, ml: { md: `${drawerWidth}px` }, bgcolor: 'rgba(8,11,18,.82)', backdropFilter: 'blur(16px)', borderBottom: '1px solid', borderColor: 'divider' }}>
         <Toolbar sx={{ minHeight: '64px !important', px: { xs: 2, md: 3.5 } }}>
           {!desktop && <IconButton edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 1 }} aria-label="메뉴 열기"><MenuRoundedIcon /></IconButton>}
-          <Typography variant="body2" color="text.secondary">KOREA EQUITY / RESEARCH</Typography>
+          <Typography variant="body2" color="text.secondary">국내 주식 리서치</Typography>
           <Box flex={1} />
-          <Chip label={['/screener', '/analysis-scans', '/unified-analysis', '/daily-reports'].some(path => location.pathname.startsWith(path)) ? 'ENGINE API' : 'MOCK DATA'} size="small" variant="outlined" sx={{ fontSize: 10, letterSpacing: '.08em' }} />
+          <Chip label="STOCKSCOPE" size="small" variant="outlined" sx={{ fontSize: 11, letterSpacing: '.06em' }} />
         </Toolbar>
       </AppBar>
       <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>

@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import TradeSignalPanel from './TradeSignalPanel';
 import SignalSummary from './SignalSummary';
 import TradeJudgmentPanel from './TradeJudgmentPanel';
+import TargetBasisNotice from './TargetBasisNotice';
+import { scenarioForDisplay, targetPriceLabel } from '../scenarioPresentation';
 
 const formatPrice = (value) => value == null ? '산출 전' : `${Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}원`;
 const formatScore = (value) => value == null ? '—' : Number(value).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -23,6 +25,7 @@ export default function AnalysisResultPanel({ result }) {
   const action = ACTION_META[result.strategyAction] || { label: result.status, color: 'default' };
   const suitability = result.suitabilityScores;
   const assessment = result.swingAssessment;
+  const scenario = scenarioForDisplay(result, result.warnings);
   const actionLabel = suitability?.status === 'UNAVAILABLE' ? '분석 보류'
     : suitability ? { BUY_CANDIDATE: '매수 검토', WATCH: '관찰', WAIT: '진입 대기', AVOID: '회피' }[result.strategyAction] : action.label;
   const score = Number(result.totalScore || 0);
@@ -68,14 +71,15 @@ export default function AnalysisResultPanel({ result }) {
       </Stack>}
       <Divider />
       <Box>
-        <Typography variant="overline" color="primary.main">STRATEGY</Typography>
+        <Typography variant="overline" color="primary.main">{result.analysisMode === 'SWING' ? '점수 기준 종목 평가' : 'STRATEGY'}</Typography>
         <Typography variant="h2" mt={0.5}>{result.strategyName || '전략 산출 전'}</Typography>
         <Typography variant="caption" color="text.secondary">{result.strategyCode || result.analysisMode}</Typography>
       </Box>
       <Stack gap={1.45}>
         <MetricRow label="현재가" value={formatPrice(result.currentPrice)} />
         <MetricRow label="진입 구간" value={result.entryFrom == null ? '유효 시나리오 없음' : `${formatPrice(result.entryFrom)} – ${formatPrice(result.entryTo)}`} />
-        <MetricRow label="목표가" value={result.targets.length ? result.targets.map(formatPrice).join(' / ') : '유효 시나리오 없음'} color="success.main" />
+        <MetricRow label={targetPriceLabel(scenario)} value={result.targets.length ? result.targets.map(formatPrice).join(' / ') : '유효 시나리오 없음'} color="success.main" />
+        <TargetBasisNotice scenario={scenario} />
         <MetricRow label="손절가" value={formatPrice(result.stopLoss)} color="error.main" />
         <MetricRow label="진입 상단 기준 위험률" value={riskRate == null ? '산출 불가' : `${riskRate.toFixed(1)}%`} />
         <MetricRow label="1차 목표 손익비" value={rewardRisk == null ? '산출 불가' : `${rewardRisk.toFixed(2)}배`} />

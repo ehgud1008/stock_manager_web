@@ -49,7 +49,9 @@ describe('UnifiedAnalysisPage', () => {
     expect(screen.getByRole('heading', { name: '추세 구조' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '매매 신호와 진입 판단' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '매매판단' })).toBeInTheDocument();
-    expect(screen.getByText('보유 유지')).toBeInTheDocument();
+    // With unknown holdings, the panel shows the supplied new-entry decision.
+    expect(screen.getByText('관망')).toBeInTheDocument();
+    expect(screen.queryByText('보유 유지')).not.toBeInTheDocument();
     expect(analyzeUnifiedStock).toHaveBeenCalledTimes(1);
     expect(screen.getByText('70,000원 ~ 71,500원')).toBeInTheDocument();
     expect(screen.getByText(/005930 · 가격일 2026-09-18/)).toBeInTheDocument();

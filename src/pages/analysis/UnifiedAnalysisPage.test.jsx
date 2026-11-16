@@ -24,6 +24,18 @@ describe('시장 전체 종합분석', () => {
     decisions.getDecisionCapabilities.mockResolvedValue({ enabled: true, aiConfigured: true });
     decisions.findImportedSnapshot.mockResolvedValue(null);
   });
+  it('저장 결과를 먼저 보여주고 실행 도구와 추가 열은 선택할 때만 펼친다', async () => {
+    setup(); await screen.findByText('삼성전자');
+    expect(screen.queryByRole('button', { name: '전체 종합분석 실행' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '거래량 (주)' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '전체 항목 보기' }));
+    expect(screen.getByRole('columnheader', { name: '거래량 (주)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '핵심 항목만' }));
+    expect(screen.queryByRole('columnheader', { name: '거래량 (주)' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '분석 실행·관리' }));
+    expect(screen.getByRole('button', { name: '전체 종합분석 실행' })).toBeVisible();
+    expect(api.startUnifiedRun).not.toHaveBeenCalled();
+  });
   it('시가 조건 제외 사유를 상세 상단에 표시하고 가격 시나리오를 제공하지 않는다', async () => {
     const detail = unifiedAnalysisFixture();
     detail.result.analysis.strategy = { strategyCode: 'OPEN_PRICE_EXCLUDED', strategyName: '시가 기준 매매 제외', action: 'AVOID', reasons: ['시가 기준 제외'] };
@@ -112,6 +124,7 @@ describe('시장 전체 종합분석', () => {
   });
   it('스테이지와 점수·전환 조건을 함께 서버에 전달한다', async () => {
     setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 조건' }));
     fireEvent.mouseDown(screen.getByLabelText('스테이지'));
     fireEvent.click(await screen.findByRole('option', { name: 'S6 · 상승 전환' }));
     fireEvent.change(screen.getByLabelText('최소 점수'), { target: { value: '70' } });
@@ -128,6 +141,8 @@ describe('시장 전체 종합분석', () => {
   it('시장·최소 거래량·최소 거래대금은 기존 정렬을 유지한 검색조건으로 보내며 초기화한다', async () => {
     api.getUnifiedItems.mockResolvedValue({ ...page, content: [{ ...item, volume: 123456, tradingAmountMillionWon: 10025 }] });
     setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 조건' }));
+    fireEvent.click(screen.getByRole('button', { name: '전체 항목 보기' }));
     expect(screen.getByText('123,456')).toBeInTheDocument();
     expect(screen.getByText('100.25')).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByLabelText('결과 시장'));
@@ -151,11 +166,13 @@ describe('시장 전체 종합분석', () => {
   });
   it('새 값이 없는 과거 결과를 0으로 표시하지 않는다', async () => {
     setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '전체 항목 보기' }));
     expect(screen.getAllByText('미저장·미확인')).toHaveLength(2);
     expect(screen.getByText(/최소값 조건에서 제외됩니다/)).toBeInTheDocument();
   });
   it('새 실행을 확인하고 중복 방지 키를 전송한다', async () => {
     api.startUnifiedRun.mockResolvedValue(run); setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '분석 실행·관리' }));
     fireEvent.click(screen.getByRole('button', { name: '전체 종합분석 실행' }));
     expect(api.startUnifiedRun).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '확인', exact: true }));
@@ -164,6 +181,7 @@ describe('시장 전체 종합분석', () => {
   it('응답 유실 재시도에서 같은 요청 키를 사용한다', async () => {
     api.startUnifiedRun.mockRejectedValueOnce(new Error('응답 유실')).mockResolvedValueOnce(run);
     setup(); await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '분석 실행·관리' }));
     for (let i = 0; i < 2; i++) {
       fireEvent.click(screen.getByRole('button', { name: '전체 종합분석 실행' }));
       fireEvent.click(screen.getByRole('button', { name: '확인', exact: true }));
@@ -175,7 +193,9 @@ describe('시장 전체 종합분석', () => {
   it('실패·미처리 종목만 재개한다', async () => {
     const partial = { ...run, status: 'COMPLETED_WITH_ERRORS', failed: 1, completed: 1 };
     api.getUnifiedItems.mockResolvedValue({ ...page, run: partial }); api.resumeUnifiedRun.mockResolvedValue(run);
-    setup(); fireEvent.click(await screen.findByRole('button', { name: '실패·미처리 재개' }));
+    await act(async () => { setup(); });
+    fireEvent.click(screen.getByRole('button', { name: '분석 실행·관리' }));
+    fireEvent.click(await screen.findByRole('button', { name: '실패·미처리 재개' }));
     expect(screen.getByText(/완료 결과와 대상 목록·기준일은 유지/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '확인', exact: true }));
     await waitFor(() => expect(api.resumeUnifiedRun).toHaveBeenCalledWith('unified-1'));
@@ -197,6 +217,7 @@ describe('시장 전체 종합분석', () => {
     let view;
     try {
       await act(async () => { view = setup(); });
+      fireEvent.click(screen.getByRole('button', { name: '분석 실행·관리' }));
       expect(screen.getByRole('button', { name: '전체 종합분석 실행' })).toBeDisabled();
       expect(screen.getByText(/미처리 1 · 확인·재시도 대기 1/)).toBeInTheDocument();
       expect(screen.getByText(/완료 종목을 보존하며 이어서/)).toBeInTheDocument();

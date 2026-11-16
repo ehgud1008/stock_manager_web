@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Accordion, AccordionDetails, AccordionSummary, Alert, Button, Chip, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import TargetBasisNotice from '../stock-analysis/components/TargetBasisNotice';
+import { TARGET_BASIS } from '../stock-analysis/scenarioPresentation';
 
 const STATES = { WAITING_ENTRY_DAY: '다음 거래일 진입 확인 대기', IN_PROGRESS: '시나리오 진행 중', TARGET_REACHED: '1차 목표 도달', STOP_REACHED: '손절 기준 도달', AMBIGUOUS: '목표·손절 동시 접촉 · 순서 미확인', NO_ENTRY: '진입 조건 미충족', WATCH_ONLY: '관찰 대상 · 진입 가정 없음', PERIOD_ENDED: '20거래일 추적 종료', WAITING_DATA: '마감 자료 대기', DATA_GAP: '경로 미확인', NO_SCENARIO: '저장된 가격 시나리오 없음', BASELINE_MISSING: '선정일 원본 확인 필요', CALENDAR_UNAVAILABLE: '거래일 달력 확인 필요', REPORT_LATE: '장 시작 전 확정 여부 확인 필요' };
 const SELECTION = { SUCCESS: '선정 성공 · 목표 달성', FAILURE_STOP: '선정 실패 · 손절 도달', FAILURE_TIMEOUT: '선정 실패 · 20거래일 목표 미달', IN_PROGRESS: '선정 평가 진행 중', WAITING: '선정 평가 대기', WAITING_DATA: '선정 평가 · 마감 자료 대기', DEFERRED: '선정 판정 보류 · 자료 확인 필요', AMBIGUOUS: '선정 판정 불가 · 선후 미확인' };
@@ -23,10 +25,10 @@ export default function ScenarioMonitoringTable({ rows, showSelection = false, o
       const stock = row.stock;
       return <TableRow key={`${row.runId}:${row.code}`}>
         {showSelection && <TableCell sx={{ minWidth: 180 }}><Typography fontWeight={600}>{row.selectionDate}</Typography><Typography variant="caption" display="block">{row.firstTrackingDate || '달력 확인 필요'} ~ {row.lastTrackingDate || '달력 확인 필요'}</Typography><Typography variant="caption" display="block">실행 {row.runId.slice(0, 8)}</Typography>{onReport && <Button size="small" onClick={() => onReport(row.runId)}>원본 보고서</Button>}</TableCell>}
-        <TableCell sx={{ minWidth: 150 }}>{onDetail ? <Button onClick={() => onDetail(row)}>{stock?.name || row.name}</Button> : stock?.name || row.name}<br />{row.code}{stock && <> · {stock.disposition === 'ENTRY_CONDITIONAL' ? '조건부 진입' : '관찰'}<br />선정일 종가 {price(stock.selectionClose)}</>}</TableCell>
+        <TableCell sx={{ minWidth: 150 }}>{onDetail ? <Button onClick={() => onDetail(row)}>{stock?.name || row.name}</Button> : stock?.name || row.name}<br />{row.code}{stock && <> · {stock.disposition === 'RESEARCH_B' ? 'B등급 비교 후보' : stock.disposition === 'ENTRY_CONDITIONAL' ? '조건부 진입' : '관찰'}<br />선정일 종가 {price(stock.selectionClose)}</>}</TableCell>
         {!stock ? <TableCell colSpan={5}><Alert severity="error">이 선정 이력의 추적 자료를 조회하지 못했습니다. 원본 보고서와 저장 자료를 확인하세요.</Alert></TableCell> : <>
           <TableCell sx={{ minWidth: 155 }}>{stock.scenario ? `${price(stock.scenario.entryFrom)} ~ ${price(stock.scenario.entryTo)}` : '시나리오 없음'}</TableCell>
-          <TableCell sx={{ minWidth: 160 }}>목표 {price(stock.scenario?.targets?.[0])}<br />손절 {price(stock.scenario?.stopLoss)}</TableCell>
+          <TableCell sx={{ minWidth: 160 }}>목표 {price(stock.scenario?.targets?.[0])}<br />손절 {price(stock.scenario?.stopLoss)}<TargetBasisNotice scenario={stock.scenario} compact /></TableCell>
           <TableCell sx={{ minWidth: 150 }}>{stock.latestPriceDate || '후속 일봉 대기'}<br />{price(stock.latestClose)}<br />선정일 대비 {pct(stock.selectionReturnPercent)}<br />확인 {stock.observedDays}/{stock.expectedDays}거래일</TableCell>
           <TableCell sx={{ minWidth: 210 }}>{stock.selectionOutcome && <Typography variant="body2" fontWeight={600}>{SELECTION[stock.selectionOutcome.result]}{stock.selectionOutcome.eventDate && ` · ${stock.selectionOutcome.eventDate}`}</Typography>}<Typography variant="caption" display="block">매매 평가</Typography><Chip size="small" color={color(stock.status)} label={STATES[stock.status] || stock.status} /><Typography variant="caption" display="block" mt={1}>{DATA[stock.dataState] || stock.dataState}</Typography>{stock.entryDate && <Typography variant="caption" display="block">모의 진입 조건 확인 {stock.entryDate}</Typography>}{stock.eventDate && <Typography variant="caption" display="block">판정일 {stock.eventDate}</Typography>}</TableCell>
           <TableCell sx={{ minWidth: 150 }}>1차 목표까지 {pct(stock.targetDistancePercent)}<br />손절까지 여유 {pct(stock.stopDistancePercent)}<Typography variant="caption" display="block">최근 확인 종가 대비 · 음수는 기준 통과</Typography></TableCell>
@@ -38,6 +40,7 @@ export default function ScenarioMonitoringTable({ rows, showSelection = false, o
       return <Accordion key={`${row.runId}:${row.code}`} disableGutters>
         <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography>{stock.name}{showSelection ? ` · ${row.selectionDate} · ${row.runId.slice(0, 8)}` : ''} · 일별 관측과 판정 근거</Typography></AccordionSummary>
         <AccordionDetails><Stack gap={1.5}>
+          <TargetBasisNotice scenario={stock.scenario} />
           <OutcomeDetails stock={stock} />
           {stock.notes.map((note, index) => <Typography variant="body2" key={index}>{note}</Typography>)}
           {stock.history.length === 0 ? <Typography>후속 거래일 자료가 아직 없습니다. 선정 종목과 고정 시나리오는 위 목록에서 확인할 수 있습니다.</Typography> : <div style={{ overflowX: 'auto' }}><Table size="small" aria-label={`${stock.name}${showSelection ? ` ${row.selectionDate} ${row.runId.slice(0, 8)}` : ''} 일별 관측`}><TableHead><TableRow>
@@ -88,7 +91,7 @@ function CompactMonitoringTable({ rows, onDetail, onReport, onRemove, deleted, b
       const label = { TIME_PROFIT: '기간 종료 · 수익', TIME_LOSS: '기간 종료 · 손실', TIME_FLAT: '기간 종료 · 보합' }[outcome?.result] || STATES[stock?.status] || '자료 확인 필요';
       return <TableRow key={`${row.runId}:${row.code}`}>
         <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.selectionDate}<Typography variant="caption" display="block">{row.runId.slice(0, 8)}</Typography></TableCell>
-        <TableCell sx={{ minWidth: 140, maxWidth: 220 }}><Typography noWrap title={stock?.name || row.name}>{onDetail ? <Button onClick={() => onDetail(row)} sx={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock?.name || row.name}</Button> : stock?.name || row.name}</Typography><Typography variant="caption">{row.code}</Typography></TableCell>
+        <TableCell sx={{ minWidth: 140, maxWidth: 220 }}><Typography noWrap title={stock?.name || row.name}>{onDetail ? <Button onClick={() => onDetail(row)} sx={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stock?.name || row.name}</Button> : stock?.name || row.name}</Typography><Typography variant="caption">{row.code}{stock?.disposition === 'RESEARCH_B' && ' · B등급 비교 후보'}</Typography>{stock?.scenario?.targetBasis === TARGET_BASIS.SYNTHETIC && <Chip size="small" color="warning" variant="outlined" label="가정 목표" />}</TableCell>
         <TableCell sx={{ maxWidth: 230 }}><Typography variant="body2">{stock?.selectionOutcome ? SELECTION[stock.selectionOutcome.result] : '선정 평가 미제공'}</Typography>{!stock ? <Typography color="error">추적 자료를 조회하지 못했습니다</Typography> : <Typography variant="caption" display="block">{stock.selectionOutcome?.eventDate || DATA[stock.dataState]}</Typography>}</TableCell>
         <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="caption" display="block">{label}</Typography>{outcome?.netReturnPercent != null ? <>종료 {pct(outcome.netReturnPercent)}</> : outcome?.markedReturnPercent != null ? <>평가 {pct(outcome.markedReturnPercent)}</> : ['WATCH_ONLY', 'NO_ENTRY'].includes(outcome?.result) ? '손익 산정 대상 아님' : '미확정'}{outcome?.result === 'AMBIGUOUS' && <Typography variant="caption" display="block">순서 미확인</Typography>}</TableCell>
         <TableCell sx={{ whiteSpace: 'nowrap' }}>{stock?.latestPriceDate || '후속 일봉 대기'}<Typography variant="caption" display="block">선정일 대비 {pct(stock?.selectionReturnPercent)}</Typography></TableCell>

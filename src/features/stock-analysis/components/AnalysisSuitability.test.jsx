@@ -12,6 +12,12 @@ const result = {
 };
 
 describe('swing suitability display', () => {
+  it('identifies projected target prices and keeps score evaluation separate', () => {
+    render(<AnalysisResultPanel result={{ ...result, entryFrom: 9800, entryTo: 10000, targets: [11000, 12000], stopLoss: 9500, targetBasis: 'STRUCTURAL_RISK_MULTIPLE' }} />);
+    expect(screen.getByText('가정 목표가')).toBeInTheDocument();
+    expect(screen.getByText('신고가 가정 목표 · 2R / 3.5R')).toBeInTheDocument();
+    expect(screen.getByText('점수 기준 종목 평가')).toBeInTheDocument();
+  });
   it('shows first-target reward/risk using the entry ceiling without treating it as a signal', () => {
     render(<AnalysisResultPanel result={{ ...result, entryFrom: 9800, entryTo: 10000, targets: [11000, 12000], stopLoss: 9500 }} />);
     expect(screen.getByText('2.00배')).toBeInTheDocument();

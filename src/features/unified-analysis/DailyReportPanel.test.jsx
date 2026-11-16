@@ -8,6 +8,20 @@ const report = { status: 'READY', tradeDate: '2026-10-13', forecastDate: '2026-1
   markets: [{ market: 'KOSPI', bias: '중립', dayReturn: 0.2, return20: 2, advancingPercent: 48, aboveEma20Percent: 52, baseScenario: '현재 흐름 유지 확인', upsideScenario: '저항 돌파 시 강화', downsideScenario: '지지 이탈 시 취소', cautions: [] }],
   candidates: [], limitations: ['업종과 공시는 미확인'], assessedStocks: 100, eligibleStocks: 110, version: 'candidate-market-v1' };
 describe('장 마감 보고서', () => {
+  it('새 보고서의 조건부 B 운영 선정과 가정 목표 근거를 표시한다', async () => {
+    const stock = { code: '001', name: '회복종목', disposition: 'ENTRY_CONDITIONAL', relativeReturn20: 2, netRewardRisk: 2,
+      evidence: [{ code: 'NET_REWARD_RISK', label: '비용 반영 손익비', value: 2, threshold: 1.8, passed: true }], cautions: ['252봉 신고가: 관측 저항 부재로 2.0R·3.5R 가정 목표 사용'],
+      newEntry: { policyVersion: 'new-entry-v3-tier', status: 'ELIGIBLE', grossRewardRisk: 2.4, effectiveScenario: { entryFrom: 10000, entryTo: 10100, stopLoss: 9900, targets: [10580], targetBasis: 'STRUCTURAL_RISK_MULTIPLE' }, suitability: { tier: 'B', score: 75, weaknesses: [] }, timing: { status: 'ELIGIBLE', reasons: [] } } };
+    api.getDailyReport.mockResolvedValue({ state: 'READY', report: { ...report, version: 'candidate-v7-profitability/test', candidates: [stock], tierLists: { comparisonB: [], comparisonBTotal: 0, signalWaiting: [], signalWaitingTotal: 0 } } });
+    render(<DailyReportPanel runId="v7" onDetail={vi.fn()} />);
+    expect(await screen.findByText('A등급·조건부 B등급 운영 선정')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('회복종목 (001) · 조건부 진입 검토'));
+    expect(screen.getByText(/B등급 조건부 운영 진입 자격 충족/)).toBeInTheDocument();
+    expect(screen.getByText(/관측 저항 부재로 2.0R·3.5R 가정 목표 사용/)).toBeInTheDocument();
+    expect(screen.getByText('신고가 가정 목표 · 2R / 3.5R')).toBeInTheDocument();
+    expect(screen.getByText('비용 차감 전 손익비: 2.4배 · 공통 신규 진입 판단 기준')).toBeInTheDocument();
+    expect(screen.getByText('비용 차감 후 손익비: 2배 · 이 보고서 기준 1.8배 이상')).toBeInTheDocument();
+  });
   it('유효 신호는 자료 보류와 운영 선정 여부를 함께 표시한다', async () => {
     const stock = { code: '009470', name: '삼화전기', disposition: 'EXCLUDED', cautions: ['필수 자료 확인 필요'], newEntry: { status: 'DEFER', reasons: ['자료 보완 필요'], suitability: { tier: 'B', score: 77.33, weaknesses: [] }, timing: { status: 'DEFER', reasons: ['자료 보완 필요'], signalWaiting: false } } };
     api.getDailyReport.mockResolvedValue({ state: 'READY', report: { ...report, tierLists: { comparisonB: [], comparisonBTotal: 0, signalWaiting: [], signalWaitingTotal: 0, activeSignals: [stock], activeSignalsTotal: 1 } } });

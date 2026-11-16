@@ -9,6 +9,7 @@ import ErrorState from '../../components/feedback/ErrorState';
 import LoadingState from '../../components/feedback/LoadingState';
 import { ANALYSIS_MODE } from '../../constants/analysisModes';
 import AnalysisHistoryPanel from '../../features/stock-analysis/components/AnalysisHistoryPanel';
+import ScoreContinuityPanel from '../../features/unified-analysis/ScoreContinuityPanel';
 import AnalysisNarrativePanel from '../../features/stock-analysis/components/AnalysisNarrativePanel';
 import AnalysisResultPanel from '../../features/stock-analysis/components/AnalysisResultPanel';
 import AnalysisToolbar from '../../features/stock-analysis/components/AnalysisToolbar';
@@ -49,6 +50,19 @@ function StockAnalysisContent() {
   const { stocks } = useStockMaster(stockMarket);
   const stockInfo = getStockByCode(stocks, stockCode);
   const stockName = stockInfo?.stockName || analysis.data?.stockName || '종목 분석';
+  const scoreHistory = history.data?.content || [];
+  const olderHistory = scoreHistory.find(item => item.baseDate < analysis.data?.baseDate
+    && item.engineVersion === analysis.data?.engineVersion);
+  const continuity = analysis.data && history.status !== 'loading' ? {
+    selected: { engineVersion: analysis.data.engineVersion, priceBasis: 'LIVE' },
+    older: olderHistory && { priceDate: olderHistory.baseDate, quality: olderHistory.dataQualityStatus },
+    previous: olderHistory && { result: { analysis: olderHistory } },
+    history: [analysis.data, ...scoreHistory.filter(item => item.analysisRunId !== analysis.data.analysisRunId)]
+      .filter(item => item.baseDate <= analysis.data.baseDate)
+      .filter((item, index, items) => items.findIndex(other => other.baseDate === item.baseDate) === index)
+      .map(item => ({ runId: item.analysisRunId, priceDate: item.baseDate, totalScore: item.totalScore,
+        engineVersion: item.engineVersion, priceBasis: 'LIVE' })),
+  } : null;
   const marketType = stockInfo?.marketType || analysis.data?.marketType || 'KRX';
 
   const executeAnalysis = async () => {
@@ -136,6 +150,9 @@ function StockAnalysisContent() {
 
         {analysis.status === 'success' && analysis.data && (
           <>
+            {mode === ANALYSIS_MODE.SWING && <Grid size={{ xs: 12 }}><ScoreContinuityPanel
+              data={{ result: { priceDate: analysis.data.baseDate, analysis: analysis.data }, collectionQuality: analysis.data.dataQualityStatus, eod: { priceBasis: 'LIVE' } }}
+              continuity={continuity} /></Grid>}
             <Grid size={{ xs: 12 }}>
               <SectionCard title="스윙 시간대 점수" caption="일봉은 진입 타이밍, 주봉은 중심 추세, 월봉은 장기 방향을 판정합니다.">
                 <TimeframeScorePanel result={analysis.data} />

@@ -15,6 +15,8 @@ import KLineStockChart from './KLineStockChart';
 import PriceDataState from './PriceDataState';
 import PriceDataStatusBar from './PriceDataStatusBar';
 import TechnicalIndicatorGuide from './TechnicalIndicatorGuide';
+import TargetBasisNotice from '../../stock-analysis/components/TargetBasisNotice';
+import { scenarioForDisplay } from '../../stock-analysis/scenarioPresentation';
 
 export default function StockChartPanel({ stockCode, analysis, refreshKey, basic = false, realData = false }) {
   const [period, setPeriod] = useState(PRICE_PERIOD.DAY);
@@ -33,6 +35,7 @@ export default function StockChartPanel({ stockCode, analysis, refreshKey, basic
     realData,
   );
   const techniques = useMemo(() => basic ? null : analyzeChartTechniques(data?.candles, period), [basic, data?.candles, period]);
+  const displayAnalysis = useMemo(() => scenarioForDisplay(analysis, analysis?.warnings), [analysis]);
 
   const renderContent = () => {
     if (status === 'loading') return <LoadingState />;
@@ -74,11 +77,12 @@ export default function StockChartPanel({ stockCode, analysis, refreshKey, basic
           lastCollectedAt={data.lastCollectedAt}
           source={data.source}
         />
+        {!basic && tradeLevelsEnabled && <TargetBasisNotice scenario={displayAnalysis} />}
         <KLineStockChart
           stockCode={stockCode}
           period={period}
           candles={data.candles}
-          analysis={basic ? undefined : analysis}
+          analysis={basic ? undefined : displayAnalysis}
           basic={basic}
           techniques={techniques}
           zonesEnabled={zonesEnabled}

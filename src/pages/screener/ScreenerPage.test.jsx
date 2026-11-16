@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material/styles';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import theme from '../../app/theme/theme';
@@ -38,7 +38,7 @@ describe('DB 페이지 조회 스크리너 화면', () => {
     expect(screen.queryByRole('button', {name: '실패·중단 재개'})).not.toBeInTheDocument();
     api.getScreenerRun.mockResolvedValue(interrupted);
     api.loadScreenerSnapshot.mockResolvedValue({...pageFixture(), run: interrupted});
-    fireEvent.click(screen.getByRole('button', {name: '정리하기'}));
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: '정리하기'})); });
     expect(await screen.findByRole('button', {name: '실패·중단 재개'})).toBeInTheDocument();
     await loaded();
     expect(api.recoverScreenerRun).toHaveBeenCalledWith(running.runId);
@@ -65,7 +65,7 @@ describe('DB 페이지 조회 스크리너 화면', () => {
     fireEvent.click(screen.getByRole('button', {name:'삼성전자 상세 보기'}));
     const detail = await screen.findByRole('dialog', {name:'삼성전자'});
     expect(within(detail).getByLabelText('상세 가격 차트')).toHaveTextContent('005930 기본 차트 실제 가격');
-    expect(await within(detail).findByText('STRATEGY')).toBeInTheDocument();
+    expect(await within(detail).findByText('점수 기준 종목 평가')).toBeInTheDocument();
     expect(within(detail).getByText('스윙 눌림목 대기')).toBeInTheDocument();
     expect(analyzeStockLive).toHaveBeenCalledWith('005930', expect.objectContaining({ analysisMode: 'SWING', forceRecalculate: true }));
     expect(within(detail).getByText('직전 봉 스테이지').parentElement).toHaveTextContent('S1');
