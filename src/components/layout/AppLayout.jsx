@@ -8,20 +8,26 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import { AppBar, Box, Chip, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Stack, Toolbar, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 const drawerWidth = 248;
 const navigation = [
+  { label: '시장과 종목', items: [
   { label: '대시보드', path: '/', icon: <DashboardOutlinedIcon /> },
   { label: '내 보유종목', path: '/holdings', icon: <AssessmentOutlinedIcon /> },
   { label: '장 마감 리포트', path: '/daily-reports', icon: <SummarizeOutlinedIcon /> },
   { label: '종합분석', path: '/unified-analysis', icon: <AutoAwesomeOutlinedIcon /> },
   { label: '종목 분석', path: '/analysis/005930', icon: <AssessmentOutlinedIcon /> },
+  ] },
+  { label: '분석·검증 도구', items: [
   { label: '전체 종목분석', path: '/analysis-scans', icon: <AssessmentOutlinedIcon /> },
   { label: '스크리너', path: '/screener', icon: <TuneOutlinedIcon /> },
   { label: '백테스트', path: '/backtest', icon: <ScienceOutlinedIcon /> },
+  ] },
+  { label: '환경 설정', items: [
   { label: '설정', path: '/settings', icon: <SettingsOutlinedIcon /> },
+  ] },
 ];
 
 function NavigationContent({ onNavigate }) {
@@ -33,21 +39,20 @@ function NavigationContent({ onNavigate }) {
         <Box><Typography fontWeight={700} letterSpacing="-.03em">STOCKSCOPE</Typography><Typography variant="caption" color="text.secondary">ANALYSIS CONSOLE</Typography></Box>
       </Stack>
       <Divider />
-      <Typography variant="overline" color="text.secondary" px={2.5} pt={3} pb={1}>시장과 종목</Typography>
-      <List sx={{ px: 1.5 }}>
-        {navigation.map((item) => {
+      {navigation.map(group => <Box component="section" key={group.label} aria-label={group.label}>
+      <Typography component="h2" variant="overline" color="text.secondary" px={2.5} pt={2.5} pb={0.5}>{group.label}</Typography>
+      <List aria-label={group.label} sx={{ px: 1.5, py: 0 }}>
+        {group.items.map((item) => {
           const selected = item.path === '/' ? location.pathname === '/' : item.path.startsWith('/analysis/') ? location.pathname.startsWith('/analysis/') : location.pathname.startsWith(item.path);
           return (
-            <Fragment key={item.path}>
-            {item.path === '/analysis-scans' && <Typography component="li" variant="overline" color="text.secondary" sx={{ listStyle: 'none', px: 1, pt: 2, pb: 1 }}>고급 분석 도구</Typography>}
-            <ListItemButton component={NavLink} to={item.path} onClick={onNavigate} selected={selected} sx={{ mb: 0.5, borderRadius: 2, '&.Mui-selected': { bgcolor: 'rgba(139,218,99,.1)', color: 'primary.light', '&:hover': { bgcolor: 'rgba(139,218,99,.14)' } } }}>
+            <ListItemButton key={item.path} component={NavLink} to={item.path} onClick={onNavigate} selected={selected} sx={{ mb: 0.5, borderRadius: 2, '&.Mui-selected': { bgcolor: 'rgba(139,218,99,.1)', color: 'primary.light', '&:hover': { bgcolor: 'rgba(139,218,99,.14)' } } }}>
               <ListItemIcon sx={{ minWidth: 38, color: selected ? 'primary.main' : 'text.secondary' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: 14, fontWeight: selected ? 650 : 500 }} />
             </ListItemButton>
-            </Fragment>
           );
         })}
       </List>
+      </Box>)}
       <Box mt="auto" p={2}>
         <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,.035)', border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="body2" fontWeight={600}>분석 자료 안내</Typography>

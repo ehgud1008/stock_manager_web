@@ -1,5 +1,4 @@
-import TradeDecisionPanel from '../../features/trade-decision/TradeDecisionPanel';
-import IntegratedDecisionPanel from '../../features/trade-decision/IntegratedDecisionPanel';
+import DecisionWorkspace from '../../features/trade-decision/DecisionWorkspace';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, LinearProgress, Stack, TextField, Typography } from '@mui/material';
@@ -9,7 +8,6 @@ import SectionCard from '../../components/common/SectionCard';
 import useStockMaster from '../../features/stock-search/hooks/useStockMaster';
 import { searchStockMaster } from '../../features/stock-search/services/stockMasterService';
 import UnifiedAnalysisResults from '../../features/unified-analysis/UnifiedAnalysisResults';
-import NewsInsightsPanel from '../../features/trade-decision/NewsInsightsPanel';
 import * as decisions from '../../api/tradeDecisionApi';
 
 export default function UnifiedSingleAnalysisPage() {
@@ -122,9 +120,7 @@ export default function UnifiedSingleAnalysisPage() {
     {state.status === 'error' && <Alert severity="error" action={<Button color="inherit" onClick={execute}>다시 실행</Button>}>{state.message}</Alert>}
     {state.status === 'success' && <>
       <UnifiedAnalysisResults data={state.data} saved={Boolean(state.snapshotId)} />
-      {state.snapshotId && capabilities.integratedContractVersion && <IntegratedDecisionPanel key={`integrated-${state.snapshotId}`} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} />}
-      {state.snapshotId && <TradeDecisionPanel key={`holding-${state.snapshotId}`} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} holdingAnalysis={state.data.holdingAnalysis} />}
-      {state.snapshotId && <NewsInsightsPanel key={state.snapshotId} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} />}
+      {state.snapshotId && <DecisionWorkspace key={state.snapshotId} snapshotId={state.snapshotId} stockCode={state.data.result.stock.stockCode} aiConfigured={capabilities.aiConfigured} holdingAnalysis={state.data.holdingAnalysis} integratedAvailable={Boolean(capabilities.integratedContractVersion)} />}
     </>}
     {state.status === 'idle' && <SectionCard><Stack alignItems="center" textAlign="center" sx={{ py: { xs: 4, md: 7 } }} gap={1.5}>
       <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(139,218,99,.08)', color: 'primary.main' }}><AutoAwesomeRoundedIcon sx={{ fontSize: 32 }} /></Box>

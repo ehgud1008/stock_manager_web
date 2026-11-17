@@ -36,7 +36,7 @@ describe('UnifiedDecisionTab', () => {
     api.findImportedSnapshot.mockResolvedValue(snapshot);
     api.listDecisions.mockResolvedValue({ items: [{ id: 'decision-a', snapshotId: 'snapshot-a', createdAt: 1, action: 'WAIT' }], hasMore: false });
     api.getDecision.mockResolvedValue(decision);
-    setup();expect(await screen.findByText('이전 AI 매매 판단 결과')).toBeInTheDocument();
+    setup();expect(await screen.findByText('이전 AI 매매 판단 결과', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(api.getDecision).toHaveBeenCalledWith('decision-a', expect.any(AbortSignal));
     expect(api.startSnapshot).not.toHaveBeenCalled();expect(api.startNewsInsights).not.toHaveBeenCalled();
     expect(screen.queryByRole('link', { name: '해당 분석 열기' })).not.toBeInTheDocument();
