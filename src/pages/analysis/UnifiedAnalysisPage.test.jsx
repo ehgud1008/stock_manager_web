@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import UnifiedAnalysisPage from './UnifiedAnalysisPage';
 import * as api from '../../api/unifiedAnalysisApi';
 import { unifiedAnalysisFixture } from '../../test/unifiedAnalysisFixtures';
+import { completedAnalysisMock } from '../../mocks/analysisMockData';
 import StockChartPanel from '../../features/stock-chart/components/StockChartPanel';
 import * as decisions from '../../api/tradeDecisionApi';
 
@@ -177,6 +178,60 @@ describe('시장 전체 종합분석', () => {
     expect(api.startUnifiedRun).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '확인', exact: true }));
     await waitFor(() => expect(api.startUnifiedRun).toHaveBeenCalledWith({ market: 'ALL' }, expect.any(String)));
+  });
+  it('종합분석 실행에서 전일까지 완료 일봉을 선택할 수 있다', async () => {
+    api.startUnifiedRun.mockResolvedValue(run);
+    setup();
+    await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '분석 실행·관리' }));
+    fireEvent.mouseDown(screen.getByLabelText('분석 가격 기준'));
+    fireEvent.click(await screen.findByRole('option', { name: '전일까지 완료 일봉' }));
+    fireEvent.click(screen.getByRole('button', { name: '전체 종합분석 실행' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인', exact: true }));
+    await waitFor(() => expect(api.startUnifiedRun).toHaveBeenCalledWith(
+      { market: 'ALL', priceMode: 'PREVIOUS_CLOSE' }, expect.any(String)));
+  });
+  it('예비 신호와 시나리오 유형을 검색하고 진입점수로 정렬한다', async () => {
+    api.getUnifiedItems.mockResolvedValue({ ...page, content: [{
+      ...item, buyState: 'PRELIMINARY', setupType: 'PULLBACK', riseScore: 75, entryScore: 82, riskScore: 60,
+      targetOne: 75000, targetTwo: 80000,
+    }] });
+    setup();
+    await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '전체 항목 보기' }));
+    expect(screen.getByText('75 / 82 / 60')).toBeInTheDocument();
+    expect(screen.getByText('75,000 / 80,000')).toBeInTheDocument();
+    expect(screen.getByText('돌파 · 예비')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '상세 검색 조건' }));
+    fireEvent.mouseDown(screen.getByLabelText('시나리오 유형'));
+    fireEvent.click(await screen.findByRole('option', { name: '눌림목', exact: true }));
+    fireEvent.mouseDown(screen.getByLabelText('매매 신호'));
+    fireEvent.click(await screen.findByRole('option', { name: '매수 예비' }));
+    fireEvent.mouseDown(screen.getByLabelText('정렬 기준'));
+    fireEvent.click(await screen.findByRole('option', { name: '진입점수' }));
+    fireEvent.click(screen.getByRole('button', { name: '검색', exact: true }));
+    await waitFor(() => expect(api.getUnifiedItems).toHaveBeenLastCalledWith('unified-1',
+      expect.objectContaining({ setup: 'PULLBACK', signal: 'BUY_PRELIMINARY', sort: 'entryScore' }), expect.any(AbortSignal)));
+  });
+  it('통합 전 이력의 상세와 차트를 다시 분석하지 않고 조회한다', async () => {
+    const oldRun = { ...run, runId: 'old-scan', status: 'COMPLETED_WITH_ERRORS' };
+    api.listUnifiedRuns.mockImplementation(async (_, archived) => [archived ? oldRun : run]);
+    api.getUnifiedItems.mockImplementation(async (_, params) => ({ ...page, run: params.archived ? oldRun : run }));
+    api.getUnifiedArchiveDetail.mockResolvedValue(completedAnalysisMock);
+    setup();
+    await screen.findByText('삼성전자');
+    fireEvent.click(screen.getByRole('button', { name: '통합 전 이력 보기' }));
+    await waitFor(() => expect(api.getUnifiedItems).toHaveBeenLastCalledWith('old-scan',
+      expect.objectContaining({ archived: true }), expect.any(AbortSignal)));
+    expect(screen.queryByRole('button', { name: '분석 실행·관리' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: '상세', exact: true }));
+    await waitFor(() => expect(api.getUnifiedArchiveDetail).toHaveBeenCalledWith('old-scan', '005930', expect.any(AbortSignal)));
+    expect(screen.getByRole('link', { name: '개별 분석 화면 (새 탭)' })).toHaveAttribute('href', '/analysis/005930');
+    expect(StockChartPanel).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: '차트' }));
+    await waitFor(() => expect(StockChartPanel).toHaveBeenCalledWith(expect.objectContaining({ stockCode: '005930', analysis: completedAnalysisMock }), undefined));
+    expect(api.startUnifiedRun).not.toHaveBeenCalled();
+    expect(api.getUnifiedDetail).not.toHaveBeenCalled();
   });
   it('응답 유실 재시도에서 같은 요청 키를 사용한다', async () => {
     api.startUnifiedRun.mockRejectedValueOnce(new Error('응답 유실')).mockResolvedValueOnce(run);

@@ -1,11 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import httpClient from './httpClient';
-import { getSnapshot, isJobPending, pause, requestIdentity, startDecision, startNewsInsights, waitForJob } from './tradeDecisionApi';
+import { getBrokerAccount, getSnapshot, isJobPending, pause, requestIdentity, startDecision, startNewsInsights, waitForJob } from './tradeDecisionApi';
 vi.mock('./httpClient', () => ({ default: { post: vi.fn(), get: vi.fn() } }));
 
 describe('tradeDecisionApi', () => {
   beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear(); });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
+  it('계좌 접근 키는 명시적으로 설정한 전용 HTTPS 주소에만 보낸다', async () => {
+    vi.stubEnv('VITE_BROKER_API_BASE_URL', '');
+    await expect(getBrokerAccount('cash', 'access', {})).rejects.toThrow(/전용 HTTPS/);
+    vi.stubEnv('VITE_BROKER_API_BASE_URL', 'http://broker.example/api');
+    await expect(getBrokerAccount('cash', 'access', {})).rejects.toThrow(/HTTPS/);
+    expect(httpClient.get).not.toHaveBeenCalled();
+    vi.stubEnv('VITE_BROKER_API_BASE_URL', 'https://broker.example/api');
+    httpClient.get.mockResolvedValue({ data: { success: true, data: { deposit: 100 } } });
+    await expect(getBrokerAccount('cash', 'access', {})).resolves.toEqual({ deposit: 100 });
+    expect(httpClient.get).toHaveBeenCalledWith('/v1/broker-account/cash', expect.objectContaining({
+      baseURL: 'https://broker.example/api', headers: { 'X-Broker-Access-Key': 'access' },
+    }));
+  });
   it('판단 입력과 멱등키를 전송하고 응답만 반환한다', async () => {
     httpClient.post.mockResolvedValue({ data: { success: true, data: { id: 'decision' } } });
     const body = { positionStatus: 'NOT_HELD', horizonTradingDays: 10 };

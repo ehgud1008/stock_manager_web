@@ -5,6 +5,7 @@ import * as api from '../../api/tradeDecisionApi';
 import DecisionValidityNotice from './DecisionValidityNotice';
 import PositionSizingView from './PositionSizingView';
 import DecisionRecheckView from './DecisionRecheckView';
+import TakeProfitPlanView from './TakeProfitPlanView';
 
 const actions = { BUY: '신규 매수 검토', ADD: '추가매수 검토', HOLD: '보유 유지', REDUCE: '부분 매도 검토', SELL: '전량 매도 검토', WAIT: '신규 진입 대기', DEFER: '판단 보류' };
 const blocks = { QUANTITY_POLICY_UNAVAILABLE: '추가매수·부분 매도 수량 정책이 없어 보유 유지로 제한했습니다.', ENTRY_NOT_ELIGIBLE: '공통 신규 진입 조건을 충족하지 못했습니다.', ANALYSIS_INCOMPLETE: '필수 분석 자료가 부족합니다.', ANALYSIS_EXPIRED: '분석 기준일이 오래되어 재분석이 필요합니다.', ANALYSIS_FUTURE: '분석 시점을 확인해야 합니다.', RESEARCH_MISSING: '완료된 외부 리서치가 없습니다.', RESEARCH_EXPIRED: '외부 리서치가 만료됐습니다.', RESEARCH_INSUFFICIENT: '외부 근거가 부족합니다.', RESEARCH_INVALID: '리서치 시점을 확인해야 합니다.', RESEARCH_FUTURE: '리서치 시점이 판단 시점보다 미래입니다.', RESEARCH_CONFLICT: '외부 자료가 엔진 신호의 재검토를 요구합니다.', POSITION_UNKNOWN: '보유정보를 확인할 수 없습니다.', ENGINE_EXIT_PRIORITY: '확인된 엔진 청산 신호를 우선했습니다.', STOP_REFERENCE_BREACHED: '분석 가격이 손절 참고선 이하입니다.', PLAN_MISSING: '가격 계획이 없습니다.' };
@@ -104,6 +105,8 @@ export default function IntegratedDecisionPanel({ snapshotId, stockCode, aiConfi
   const valid = Number.isInteger(Number(horizon)) && Number(horizon) >= 1 && Number(horizon) <= 252;
   return <SectionCard title="AI 통합 매매 판단" caption="기술적 분석·완료 뉴스 리서치·현재 등록 잔고를 함께 검토합니다.">
     <Stack gap={2}>
+      <Button component="a" href="/trade-decisions/basket" sx={{ alignSelf: 'flex-start' }}>다종목 위험 검토 열기</Button>
+      <Button component="a" href="/trade-decisions/statistics" sx={{ alignSelf: 'flex-start' }}>누적 모의 성과 열기</Button>
       <Alert severity="info">주문 전 검토 의견입니다. 자동 주문은 실행하지 않습니다. 먼저 뉴스·업황 분석을 완료하면 같은 분석의 최신 리서치를 연결합니다.</Alert>
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5}>
         <TextField type="number" label="관측 기간 (거래일)" value={horizon} onChange={e => setHorizon(e.target.value)} inputProps={{ min: 1, max: 252 }} disabled={busy} />
@@ -128,6 +131,8 @@ export default function IntegratedDecisionPanel({ snapshotId, stockCode, aiConfi
         <Typography variant="body2">저장 당시 리서치: {policy.research.status === 'VALID' ? '연결 완료' : '미확보·만료·근거 확인 필요'} · {policy.research.jobId || '연결 없음'}</Typography>
         <PositionSizingView result={result} />
         {job.status === 'SUCCEEDED' && <DecisionRecheckView decisionId={job.id} />}
+        {job.status === 'SUCCEEDED' && policy.plan?.targets?.length > 0 &&
+          <TakeProfitPlanView key={job.id} decisionId={job.id} targets={policy.plan.targets} />}
         {policy.plan && <Typography variant="body2">엔진 가격 계획: 진입 {Number(policy.plan.entryFrom).toLocaleString('ko-KR')}~{Number(policy.plan.entryTo).toLocaleString('ko-KR')}원 · 손절 {Number(policy.plan.stopLoss).toLocaleString('ko-KR')}원 · 목표 {policy.plan.targets.map(v => Number(v).toLocaleString('ko-KR')).join(' / ')}원</Typography>}
         {['supportingReasons', 'opposingReasons'].map(group => <Stack key={group} gap={1}><Typography fontWeight={600}>{group === 'supportingReasons' ? '판단 근거' : '반대 근거'}</Typography>{review?.[group]?.map((reason, i) => <Stack key={i} gap={0.5}><Typography variant="body2">{reason.text}</Typography>{reason.quote && <Typography component="blockquote" variant="body2" sx={{ m: 0, pl: 2, borderLeft: 2, borderColor: 'divider' }}>“{reason.quote}”</Typography>}{reason.sourceIds?.map(id => { const source = policy.research.sources.find(s => s.id === id); return source && <Typography key={id} variant="caption">출처: {source.title}</Typography>; })}</Stack>)}</Stack>)}
         {!!review?.reviewConditions?.length && <Stack gap={0.5}><Typography fontWeight={600}>재검토 조건</Typography>{review.reviewConditions.map((v, i) => <Typography key={i} variant="body2">• {v}</Typography>)}</Stack>}

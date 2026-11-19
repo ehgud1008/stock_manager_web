@@ -5,12 +5,15 @@ const unwrap = ({ data }) => {
   if (!data?.success) throw new Error(data?.message || '종합분석 요청을 완료하지 못했습니다.');
   return data.data;
 };
-export const listUnifiedRuns = signal => httpClient.get(runsPath, { signal }).then(unwrap);
+export const listUnifiedRuns = (signal, archived = false) =>
+  httpClient.get(runsPath, archived ? { signal, params: { archived: true } } : { signal }).then(unwrap);
 export const startUnifiedRun = (request, key) => httpClient.post(runsPath, request, { headers: { 'Idempotency-Key': key } }).then(unwrap);
 export const resumeUnifiedRun = id => httpClient.post(`${runsPath}/${id}/resume`).then(unwrap);
 export const recoverUnifiedRun = id => httpClient.post(`${runsPath}/${id}/recover`).then(unwrap);
 export const getUnifiedItems = (id, params, signal) => httpClient.get(`${runsPath}/${id}/items`, { params, signal }).then(unwrap);
 export const getUnifiedDetail = (id, code, signal) => httpClient.get(`${runsPath}/${id}/items/${code}`, { signal }).then(unwrap);
+export const getUnifiedArchiveDetail = (id, code, signal) =>
+  httpClient.get(`${runsPath}/archive/${id}/items/${code}`, { signal }).then(unwrap);
 export const getUnifiedScoreHistory = (id, code, signal) => httpClient.get(`${runsPath}/${id}/items/${code}/score-history`, { signal }).then(unwrap);
 export const listDailyReports = (params, signal) => httpClient.get('/v1/unified-analysis/reports', { params, signal }).then(unwrap);
 export const getDailyReport = (id, signal) => httpClient.get(`${runsPath}/${id}/report`, { signal }).then(unwrap);

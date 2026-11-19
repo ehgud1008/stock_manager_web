@@ -38,6 +38,7 @@ export default function HoldingsPage() {
   };
   return <Stack gap={2.5}>
     <Typography variant="h1">내 보유종목</Typography>
+    <Button href="/holdings/broker" sx={{ alignSelf: 'flex-start' }}>키움 잔고·체결·손익 조회</Button>
     <Alert severity="info">계좌 전체를 합산한 국내 주식 잔고를 직접 등록합니다. 전량 매도한 종목은 수량을 0으로 저장하세요. 미등록 종목은 보유 미확인으로 처리합니다. 증권사 자동 연동은 아닙니다.</Alert>
     {loading && <LinearProgress />}
     {error && <Alert severity="error" action={<Button color="inherit" onClick={() => { setDraft(blank()); setReload(n => n + 1); }}>새로고침</Button>}>{error}</Alert>}

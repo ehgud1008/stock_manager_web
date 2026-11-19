@@ -21,7 +21,6 @@ const navigation = [
   { label: '종목 분석', path: '/analysis/005930', icon: <AssessmentOutlinedIcon /> },
   ] },
   { label: '분석·검증 도구', items: [
-  { label: '전체 종목분석', path: '/analysis-scans', icon: <AssessmentOutlinedIcon /> },
   { label: '스크리너', path: '/screener', icon: <TuneOutlinedIcon /> },
   { label: '백테스트', path: '/backtest', icon: <ScienceOutlinedIcon /> },
   ] },

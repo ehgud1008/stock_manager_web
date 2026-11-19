@@ -17,6 +17,23 @@ export const getDecisionOutcome = (id, signal) => httpClient.get(`/v1/trade-deci
 export const getDecisionComparison = (id, signal) => httpClient.get(`/v1/trade-decisions/${id}/comparison`, { signal }).then(unwrap);
 export const getDecisionValidity = (id, signal) => httpClient.get(`/v1/trade-decisions/${id}/validity`, { signal }).then(unwrap);
 export const getDecisionRecheck = (id, signal) => httpClient.get(`/v1/trade-decisions/${id}/recheck`, { signal }).then(unwrap);
+export const getDecisionStatistics = (params, signal) => httpClient.get('/v1/trade-decisions/statistics', { params, signal }).then(unwrap);
+export const previewTakeProfit = (id, percentages, signal) => httpClient.post(`/v1/trade-decisions/${id}/take-profit-preview`, { percentages }, { signal }).then(unwrap);
+export async function getBrokerAccount(section, key, params, signal) {
+  const configured = import.meta.env.VITE_BROKER_API_BASE_URL;
+  if (!configured) throw new Error('계좌 조회 전용 HTTPS API 주소가 설정되지 않았습니다.');
+  const apiUrl = new URL(configured);
+  const secure = url => url.protocol === 'https:' ||
+    (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  if (!secure(new URL(window.location.origin)) || !secure(apiUrl) || apiUrl.origin === window.location.origin ||
+      apiUrl.username || apiUrl.password || apiUrl.search || apiUrl.hash) {
+    throw new Error('계좌 조회는 HTTPS 또는 로컬 연결에서 사용하세요.');
+  }
+  return httpClient.get(`/v1/broker-account/${section}`, { baseURL: apiUrl.href, params, signal,
+    headers: { 'X-Broker-Access-Key': key } }).then(unwrap);
+}
+export const listDecisionBasketCandidates = (page, signal) => httpClient.get('/v1/trade-decisions/basket/candidates', { params: { page }, signal }).then(unwrap);
+export const previewDecisionBasket = (body, signal) => httpClient.post('/v1/trade-decisions/basket/preview', body, { signal }).then(unwrap);
 export const startNewsInsights = (id, body, key, signal) => post(`analysis-snapshots/${id}/news-insights`, body, key, signal);
 export const getDecision = (id, signal) => httpClient.get(`/v1/trade-decisions/${id}`, { signal }).then(unwrap);
 export const reviseDecision = (id, key, signal) => post(`trade-decisions/${id}/revisions`, {}, key, signal);
