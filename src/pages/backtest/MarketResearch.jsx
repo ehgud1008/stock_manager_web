@@ -100,7 +100,7 @@ export default function MarketResearch() {
   const views = [job, compare].filter(j => j?.metrics);
   const trades = result?.trades || [];
   return <Stack gap={2}>
-    <SectionCard title="시장 전체 백테스트" caption="각 거래일의 상장 종목에서 돌파 신호를 찾습니다. 동시에 발생한 신호는 선정일 거래대금이 큰 순서로 진입합니다.">
+    <SectionCard title="시장 전체 백테스트" caption="키움의 현재 상장 주식 목록으로 과거 돌파 신호를 찾습니다. 이후 상장폐지된 종목은 성과에 포함되지 않습니다.">
       <Stack component="form" onSubmit={e => action(e, 'create')} gap={2}>
         <Grid container spacing={2}>
           <Grid size={{ xs: 6, md: 3 }}><TextField {...input('market')} select label="시장">
@@ -114,7 +114,7 @@ export default function MarketResearch() {
           <Grid size={{ xs: 12, md: 6 }}><TextField {...input('missingSettlement')} select label="보유 종목 소멸·기준가 변경 시 처리">
             {Object.entries(settlement).map(([v,n]) => <MenuItem value={v} key={v}>{n}</MenuItem>)}</TextField></Grid>
         </Grid>
-        <Typography variant="body2" color="text.secondary">다음 거래일 시가에 진입하고 보유기간 마지막 종가에 청산합니다. 승률은 편도 비용과 슬리피지를 반영한 수익 거래 수를 전체 청산 건수로 나눕니다. 현금배당은 제외합니다.</Typography>
+        <Typography variant="body2" color="text.secondary">신호가 겹치면 거래대금이 큰 순으로 다음 거래일 시가에 진입합니다. 보유기간 마지막 종가에 청산합니다. 승률은 편도 비용과 슬리피지를 반영한 수익 거래 수를 전체 청산 건수로 나눕니다. 현금배당은 제외합니다.</Typography>
         <Button type="submit" variant="contained" disabled={loading}>시장 백테스트 실행</Button>
       </Stack>
     </SectionCard>
@@ -127,7 +127,7 @@ export default function MarketResearch() {
         {job && <Typography>{states[job.state]} {job.progress && ' · 처리일 ' + job.progress} {job.message}</Typography>}
         {job && ['QUEUED','RUNNING','FAILED','CANCELLED'].includes(job.state) &&
           <Button disabled={loading} onClick={e => action(e, ['FAILED','CANCELLED'].includes(job.state) ? 'retry' : 'cancel')}>
-            {['FAILED','CANCELLED'].includes(job.state) ? '저장 시세로 재시도' : '실행 중단'}</Button>}
+            {['FAILED','CANCELLED'].includes(job.state) ? '이어서 재시도' : '실행 중단'}</Button>}
         {job?.metrics && <>
           <TextField select label="비교할 실행" value={other} onChange={e => setOther(e.target.value)}>
             <MenuItem value="">선택하세요</MenuItem>
@@ -145,7 +145,7 @@ export default function MarketResearch() {
         </>}
       </Stack>}
     </SectionCard>
-    {result && <SectionCard title="월별 계좌 성과">
+    {result && <SectionCard title="월별 계좌 성과" caption={result.version === 'KRX_BREAKOUT_1' ? 'KRX 일별 종목 목록으로 실행한 과거 결과' : '키움 현재 상장 주식 목록으로 실행한 결과'}>
       <TableContainer sx={{ maxHeight: 320 }}><Table stickyHeader size="small"><TableHead><TableRow>
         {['월','거래일','월 마지막 평가액','기간 수익률'].map(label => <TableCell key={label}>{label}</TableCell>)}
       </TableRow></TableHead><TableBody>{monthlyReturns(result).map(m => <TableRow key={m.month}>
